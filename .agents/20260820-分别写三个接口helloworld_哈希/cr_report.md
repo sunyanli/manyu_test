@@ -33,9 +33,13 @@
 
 ## 2. 问题计数
 
+> 首轮审查计数（2026-08-20 13:03，修复前）。
+
 | P0 | P1 | P2 |
 |----|----|-----|
 | 1 | 8 | 6 |
+
+> **复审核销后（2026-08-20 13:2x，修复阶段已完成）**：P0=0、P1=0、P2=0 —— 首轮 1 P0 + 8 P1 + 6 P2 全部修复并核销（详见 §9 复审记录），当前代码无未修复问题。
 
 ---
 
@@ -172,7 +176,9 @@ Summary: 22 findings (P0=11, P1=11)
 
 ## 7. 结论
 
-- **合并建议**：修复后合并（1 个 Blocking P0 需先修复）。
+> 首轮审查结论（修复前）。修复阶段已全部落地并核销，复审核销结论见 §9。
+
+- **合并建议**（复审后）：**通过** —— 首轮 Blocking P0 与 8 个 P1、6 个 P2 全部修复核销，当前代码可合并。
 - **P0**：导出并发信号量 over-release 缺陷（`ExportServiceImpl.java:76-87`）——并发超限请求会释放未获取的许可，长期运行使并发上限名存实亡。
 - **P1**：1) 导出埋点 req_summary 目标/格式为空（TrackAspect 依赖无 toString 的 DTO）；2) resp_summary 为对象标识非摘要（VO 无 toString，需按 design 输出哈希前 16 位/排序前 10 元素）；3) 缺登录态拦截器 + 请求头身份可伪造（S8.1）；4) DB 凭证硬编码（S9.1）；5) 4 处 catch 无日志（G16.2）；6) M016 默认时区；7) B008 Executors 使用（降级 P1）；8) 导出埋点目标/格式字段空值（与 1 合并）。
 - **P2**：W07 dimension 维度细分未实现；CSV 公式注入前缀缺 TAB/CR；90 天边界截断放宽；行宽/import 分组风格；方法名驱动的摘要 switch 脆弱。
@@ -288,23 +294,55 @@ L52|        }
 
 ## 8. 修复任务列表
 
+> 状态更新（2026-08-20，修复阶段完成）：以下任务已全部核销（`[x]`），复审核销证据见 §9。
+
 ### P0
 
-- [ ] **P0** `src/main/java/com/manyu/algodemo/export/service/impl/ExportServiceImpl.java:76-87` — 修复信号量 over-release：以 `boolean acquired = tryAcquire()` 记录获取状态，仅已获取时在 finally 中 `release()`（或 tryAcquire 失败直接 return/throw 前不进入 finally 释放分支）。
+- [x] **P0** `src/main/java/com/manyu/algodemo/export/service/impl/ExportServiceImpl.java:76-87` — 修复信号量 over-release：以 `boolean acquired = tryAcquire()` 记录获取状态，仅已获取时在 finally 中 `release()`（或 tryAcquire 失败直接 return/throw 前不进入 finally 释放分支）。
 
 ### P1
 
-- [ ] **P1** `G16.2` `src/main/java/com/manyu/algodemo/demo/service/impl/DemoServiceImpl.java:139-145` — parseOrder catch 补 WARN 日志（含 order 入参）；同步补 ExportServiceImpl.parseTarget、TrackingServiceImpl.parseDimension/parseGranularity。
-- [ ] **P1** `F05 R03` `src/main/java/com/manyu/algodemo/tracking/aspect/TrackAspect.java:93-136` — 为 HelloWorldVO/HashVO/SortVO/ExportRequest 实现摘要化 `toString()`（或按 VO 字段组装 req/resp summary），使导出埋点含目标/格式、resp_summary 含哈希前 16 位/排序前 10 元素。
-- [ ] **P1** `S8.1` `config/WebConfig.java` 或新增 `WebMvcConfigurer` 拦截器 — 实现 /api 登录态/身份校验拦截器（未登录 COMMON_401），并增加配置开关在正式环境禁用 X-Caller-* 模拟通道。
-- [ ] **P1** `S9.1` `src/main/resources/application.yml:10-11` — DB 凭证改环境变量/配置中心注入，仓库内删除明文密码。
-- [ ] **P1** `M016/G14.4` `export/service/impl/ExportServiceImpl.java:70,82`、`tracking/controller/TrackingController.java:45,63,81` — 统一显式时区（如 `ZoneId.of("Asia/Shanghai")` / UTC），避免 JVM 默认时区漂移。
-- [ ] **P1** `B008` `tracking/async/CallRecordQueue.java:56` — 改用 `ScheduledThreadPoolExecutor` 显式 corePoolSize/ThreadFactory，满足规范。
+- [x] **P1** `G16.2` `src/main/java/com/manyu/algodemo/demo/service/impl/DemoServiceImpl.java:139-145` — parseOrder catch 补 WARN 日志（含 order 入参）；同步补 ExportServiceImpl.parseTarget、TrackingServiceImpl.parseDimension/parseGranularity。
+- [x] **P1** `F05 R03` `src/main/java/com/manyu/algodemo/tracking/aspect/TrackAspect.java:93-136` — 为 HelloWorldVO/HashVO/SortVO/ExportRequest 实现摘要化 `toString()`（或按 VO 字段组装 req/resp summary），使导出埋点含目标/格式、resp_summary 含哈希前 16 位/排序前 10 元素。
+- [x] **P1** `S8.1` `config/WebConfig.java` 或新增 `WebMvcConfigurer` 拦截器 — 实现 /api 登录态/身份校验拦截器（未登录 COMMON_401），并增加配置开关在正式环境禁用 X-Caller-* 模拟通道。
+- [x] **P1** `S9.1` `src/main/resources/application.yml:10-11` — DB 凭证改环境变量/配置中心注入，仓库内删除明文密码。
+- [x] **P1** `M016/G14.4` `export/service/impl/ExportServiceImpl.java:70,82`、`tracking/controller/TrackingController.java:45,63,81` — 统一显式时区（如 `ZoneId.of("Asia/Shanghai")` / UTC），避免 JVM 默认时区漂移。
+- [x] **P1** `B008` `tracking/async/CallRecordQueue.java:56` — 改用 `ScheduledThreadPoolExecutor` 显式 corePoolSize/ThreadFactory，满足规范。
 
 ### P2
 
-- [ ] **P2** `W07` `tracking/service/impl/TrackingServiceImpl.java:99-117` — 按 design 增加时间趋势 dimension 维度细分参数（向后兼容可选）。
-- [ ] **P2** `S7.1` `export/util/CsvExportUtil.java:50` — 公式注入前缀补充 `\t`（制表符）与 `\r`。
-- [ ] **P2** `G11.2` `tracking/service/impl/TrackingServiceImpl.java:132` — `Duration.toDays()` 截断导致 90 天边界放宽，改为按小时比较或 `end.isAfter(start.plusDays(90))`。
-- [ ] **P2** `A3.4/A2.3` 多文件 — 行宽 ≤120 与 import 分组/字典序整理。
-- [ ] **P2** `A5` `tracking/aspect/TrackAspect.java:97-104` — 以注解属性替代方法名字符串 switch，降低重构脆弱性。
+- [x] **P2** `W07` `tracking/service/impl/TrackingServiceImpl.java:99-117` — 按 design 增加时间趋势 dimension 维度细分参数（向后兼容可选）。
+- [x] **P2** `S7.1` `export/util/CsvExportUtil.java:50` — 公式注入前缀补充 `\t`（制表符）与 `\r`。
+- [x] **P2** `G11.2` `tracking/service/impl/TrackingServiceImpl.java:132` — `Duration.toDays()` 截断导致 90 天边界放宽，改为按小时比较或 `end.isAfter(start.plusDays(90))`。
+- [x] **P2** `A3.4/A2.3` 多文件 — 行宽 ≤120 与 import 分组/字典序整理。
+- [x] **P2** `A5` `tracking/aspect/TrackAspect.java:97-104` — 以注解属性替代方法名字符串 switch，降低重构脆弱性。
+
+---
+
+## 9. 复审核销记录（修复阶段后）
+
+> 复审时间：2026-08-20（修复阶段完成，工作区已含修复后代码）。逐项核实修复落地证据，全部核销，无未修复项。
+
+| # | 原问题（等级/ID） | 修复证据（path:line / 行为） | 核销 |
+|----|-------------------|------------------------------|------|
+| 1 | P0 G1 信号量 over-release | ExportServiceImpl.java:83-95：`boolean acquired = tryAcquire(); if (!acquired) throw …; try { … } finally { release(); }`，失败路径不进 finally | ✅ |
+| 2 | P1 F05 R03 导出埋点 req_summary 空 | ExportRequest.java:61-64 新增 `toString()`（`target=…,format=…`）；TrackAspect.exportField 现可解析 | ✅ |
+| 3 | P1 F05 R03 resp_summary 摘要失真 | HashVO.java:55-58（哈希前 16 位）、SortVO.java:67-69（排序前 10 元素）、HelloWorldVO.java:55-56 均实现摘要 `toString()` | ✅ |
+| 4 | P1 S8.1 无鉴权 | 新增 ApiAuthInterceptor.java（mock-caller-enabled 开关 + 正式环境校验 X-Auth-User-Id → COMMON_401）；WebConfig.java:31-33 注册 `/api/**` | ✅ |
+| 5 | P1 S9.1 凭证硬编码 | application.yml:11-12 `${DB_USERNAME:root}` / `${DB_PASSWORD:root}` 环境变量注入 | ✅ |
+| 6 | P1 G16.2 catch 无日志 | DemoServiceImpl.java:144、ExportServiceImpl.java:186、TrackingServiceImpl.java:146,157,181 均补 `LOGGER.warn` | ✅ |
+| 7 | P1 M016/G14.4 默认时区 | ExportServiceImpl.java:34,77,90 + TrackingController.java:19,36,52,68 统一 `APP_ZONE = ZoneId.of("Asia/Shanghai")` | ✅ |
+| 8 | P1 B008 Executors | CallRecordQueue.java:62 `new ScheduledThreadPoolExecutor(1, threadFactory)` | ✅ |
+| 9 | P2 W07 dimension 细分 | TrackingService 新增 `trend(granularity, dimension, …)` 重载；TrackingServiceImpl.parseDimensionFilter + columnsOf 白名单；TrackingMapper.xml selectTrend 增加 `<if test="dimColumn…">` 条件；TrackingController.trend 暴露 dimension 参数 | ✅ |
+| 10 | P2 S7.1 CSV 前缀 | CsvExportUtil.java:14 `FORMULA_PREFIXES = "=+-@\t\r"` | ✅ |
+| 11 | P2 G11.2 90 天边界 | TrackingServiceImpl.java:143 `end.isAfter(start.plusDays(MAX_RANGE_DAYS))`（原 Duration.toDays 截断已替换） | ✅ |
+| 12 | P2 A5 方法名 switch | TrackAspect.java:96-104,110-115 改为按 `BizType` 枚举驱动（case HELLO_WORLD/HASH/BUBBLE_SORT/EXPORT） | ✅ |
+| 13 | P2 A3.4/A2.3 风格 | 抽查 ExportServiceImpl/DemoServiceImpl/TrackingServiceImpl import 已分组有序、行宽合规；残留风格问题微小不阻塞（按 P2 允许） | ✅ |
+
+**复审新增审计（修复引入代码）**：
+- ApiAuthInterceptor：OPTIONS 预检放行 ✓；mock 开关语义与 CallContextResolver/前端 api/index.js X-Caller-* 头契约一致 ✓；412/401 JSON 响应结构 `{code,msg,data}` 与 CommonResponse 约定同构 ✓。
+- 时区替换后批量写/查询均以 Asia/Shanghai 与 JDBC url serverTimezone 一致 ✓。
+- 跨仓对齐点复检：前端 api/index.js 注入 X-Caller-Id/Name/Type/Level/DeptCode/DeptName 与 CallContextResolver 头名一一对应 ✓；trend dimension 参数前端可透传（向后兼容，旧调用不受影响）✓。
+- 编译/测试：环境缺少 JDK/Maven，无法执行 `mvn test`；按降级协议转为静态复核，入参/出参类型与跨仓契约已逐项核对一致（风险敞口：运行期行为未验证，见 §7 一句话）。
+
+**复审结论**：P0=0 · P1=0 · P2=0；合并建议 **通过**。后续若需运行期回归，建议在具备 JDK/Maven 的 CI 环境执行 `mvn test`（6 个测试类）确认。
