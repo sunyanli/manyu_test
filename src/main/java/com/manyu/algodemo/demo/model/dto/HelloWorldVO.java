@@ -45,4 +45,14 @@ public class HelloWorldVO {
     public void setCostTimeMs(long costTimeMs) {
         this.costTimeMs = costTimeMs;
     }
+
+    /**
+     * 摘要字符串，供埋点出参摘要记录。
+     *
+     * @return 形如 {@code message=Hello, Alice!,costTimeMs=1}
+     */
+    @Override
+    public String toString() {
+        return "message=" + (message == null ? "" : message) + ",costTimeMs=" + costTimeMs;
+    }
 }

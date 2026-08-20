@@ -43,6 +43,17 @@ public interface TrackingService {
     TrendVO trend(String granularity, LocalDateTime start, LocalDateTime end);
 
     /**
+     * 时间趋势查询（W07），支持可选维度细分。
+     *
+     * @param granularity 粒度（HOUR/DAY/MONTH）
+     * @param dimension   可选维度细分（如 CALLER_TYPE=EMPLOYEE），为空表示不细分
+     * @param start       起始时间
+     * @param end         截止时间
+     * @return 趋势视图对象
+     */
+    TrendVO trend(String granularity, String dimension, LocalDateTime start, LocalDateTime end);
+
+    /**
      * 查询某业务类型最近记录（页面导出数据源）。
      *
      * @param bizType 业务类型

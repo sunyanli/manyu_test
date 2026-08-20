@@ -59,6 +59,9 @@
         FROM call_record
         WHERE gmt_create &gt;= #{start}
           AND gmt_create &lt;= #{end}
+        <if test="dimColumn != null and dimColumn != ''">
+          AND ${dimColumn} = #{dimValue}
+        </if>
         GROUP BY time
         ORDER BY time ASC
     </select>

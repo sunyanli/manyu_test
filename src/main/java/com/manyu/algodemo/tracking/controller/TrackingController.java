@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /**
  * tracking 模块控制器：W05 调用概况 / W06 维度统计 / W07 时间趋势。
@@ -19,6 +20,9 @@ import java.time.LocalDateTime;
 @RestController
 @RequestMapping("/api/tracking")
 public class TrackingController {
+
+    /** 与数据源 serverTimezone=Asia/Shanghai 保持一致，避免 JVM 默认时区漂移（M016）。 */
+    private static final ZoneId APP_ZONE = ZoneId.of("Asia/Shanghai");
 
     private final TrackingService trackingService;
 
@@ -42,7 +46,7 @@ public class TrackingController {
     public CommonResponse<OverviewVO> overview(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
-        LocalDateTime end = endTime == null ? LocalDateTime.now() : endTime;
+        LocalDateTime end = endTime == null ? LocalDateTime.now(APP_ZONE) : endTime;
         LocalDateTime start = startTime == null ? end.minusDays(30) : startTime;
         return CommonResponse.ok(trackingService.overview(start, end));
     }
@@ -60,7 +64,7 @@ public class TrackingController {
             @RequestParam String dimension,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
-        LocalDateTime end = endTime == null ? LocalDateTime.now() : endTime;
+        LocalDateTime end = endTime == null ? LocalDateTime.now(APP_ZONE) : endTime;
         LocalDateTime start = startTime == null ? end.minusDays(30) : startTime;
         return CommonResponse.ok(trackingService.stats(dimension, start, end));
     }
@@ -69,6 +73,7 @@ public class TrackingController {
      * W07 时间趋势查询。
      *
      * @param granularity 粒度：HOUR/DAY/MONTH
+     * @param dimension   可选维度细分（如 CALLER_TYPE=EMPLOYEE）
      * @param startTime   起始时间
      * @param endTime     截止时间
      * @return 趋势数据
@@ -76,10 +81,11 @@ public class TrackingController {
     @GetMapping("/trend")
     public CommonResponse<TrendVO> trend(
             @RequestParam(required = false) String granularity,
+            @RequestParam(required = false) String dimension,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime) {
-        LocalDateTime end = endTime == null ? LocalDateTime.now() : endTime;
+        LocalDateTime end = endTime == null ? LocalDateTime.now(APP_ZONE) : endTime;
         LocalDateTime start = startTime == null ? end.minusDays(30) : startTime;
-        return CommonResponse.ok(trackingService.trend(granularity, start, end));
+        return CommonResponse.ok(trackingService.trend(granularity, dimension, start, end));
     }
 }

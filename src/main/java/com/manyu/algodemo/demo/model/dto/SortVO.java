@@ -57,4 +57,23 @@ public class SortVO {
     public void setAlgorithmVersion(String algorithmVersion) {
         this.algorithmVersion = algorithmVersion;
     }
+
+    /**
+     * 摘要字符串：含排序结果前 10 元素，供埋点出参摘要记录（不含完整数组，避免超长落库）。
+     *
+     * @return 形如 {@code originalSize=5,sorted=[2.0, 3.0, ...],swaps=6}
+     */
+    @Override
+    public String toString() {
+        String sortedPreview = preview(sorted, 10);
+        return "originalSize=" + originalSize + ",sorted=" + sortedPreview + ",swaps=" + swaps;
+    }
+
+    private String preview(List<Double> values, int limit) {
+        if (values == null || values.isEmpty()) {
+            return "[]";
+        }
+        List<Double> head = values.size() <= limit ? values : values.subList(0, limit);
+        return head + (values.size() > limit ? "..." : "");
+    }
 }

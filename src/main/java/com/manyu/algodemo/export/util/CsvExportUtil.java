@@ -11,7 +11,7 @@ public final class CsvExportUtil {
     /** CSV 行分隔符。 */
     private static final String CRLF = "\r\n";
     /** 公式注入风险前缀。 */
-    private static final String FORMULA_PREFIXES = "=+-@";
+    private static final String FORMULA_PREFIXES = "=+-@\t\r";
 
     private CsvExportUtil() {
     }
@@ -46,7 +46,7 @@ public final class CsvExportUtil {
         if (value == null) {
             return "";
         }
-        // R04 防 CSV 公式注入：以 = + - @ 开头的单元格前置单引号
+        // R04 防 CSV 公式注入：以 = + - @ 或制表符/回车开头的单元格前置单引号
         if (!value.isEmpty() && FORMULA_PREFIXES.indexOf(value.charAt(0)) >= 0) {
             value = "'" + value;
         }

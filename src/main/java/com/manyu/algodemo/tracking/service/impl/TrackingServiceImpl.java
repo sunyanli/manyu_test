@@ -14,11 +14,12 @@ import com.manyu.algodemo.tracking.model.entity.CallRecordDO;
 import com.manyu.algodemo.tracking.model.enums.StatsDimension;
 import com.manyu.algodemo.tracking.model.enums.TrendGranularity;
 import com.manyu.algodemo.tracking.service.TrackingService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +30,8 @@ import java.util.Map;
  */
 @Service
 public class TrackingServiceImpl implements TrackingService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(TrackingServiceImpl.class);
 
     /** 时间范围最大跨度（天）。 */
     private static final long MAX_RANGE_DAYS = 90L;
@@ -97,9 +100,17 @@ public class TrackingServiceImpl implements TrackingService {
      */
     @Override
     public TrendVO trend(String granularity, LocalDateTime start, LocalDateTime end) {
+        return trend(granularity, null, start, end);
+    }
+
+    @Override
+    public TrendVO trend(String granularity, String dimension, LocalDateTime start, LocalDateTime end) {
         validateRange(start, end);
         TrendGranularity gran = parseGranularity(granularity);
-        List<Map<String, Object>> rows = trackingMapper.selectTrend(timeExprOf(gran), start, end);
+        DimensionFilter filter = parseDimensionFilter(dimension);
+        List<Map<String, Object>> rows = trackingMapper.selectTrend(
+                timeExprOf(gran), filter == null ? null : filter.column(),
+                filter == null ? null : filter.value(), start, end);
         TrendVO vo = new TrendVO();
         vo.setGranularity(gran.name());
         List<TrendPointVO> points = new ArrayList<>();
@@ -129,7 +140,7 @@ public class TrackingServiceImpl implements TrackingService {
         if (start == null || end == null || start.isAfter(end)) {
             throw new BizException(ErrorCode.TRACKING_001);
         }
-        if (Duration.between(start, end).toDays() > MAX_RANGE_DAYS) {
+        if (end.isAfter(start.plusDays(MAX_RANGE_DAYS))) {
             throw new BizException(ErrorCode.TRACKING_003);
         }
     }
@@ -138,8 +149,32 @@ public class TrackingServiceImpl implements TrackingService {
         try {
             return StatsDimension.valueOf(dimension);
         } catch (IllegalArgumentException e) {
+            LOGGER.warn("不支持的统计维度: {}", dimension);
             throw new BizException(ErrorCode.TRACKING_002, "不支持的统计维度: " + dimension);
         }
+    }
+
+    /**
+     * 解析 W07 可选维度细分参数，格式 {@code CALLER_TYPE=EMPLOYEE}。
+     *
+     * @param dimension 维度细化参数，为空时返回 {@code null}
+     * @return 白名单映射后的列名与参数化值
+     */
+    private DimensionFilter parseDimensionFilter(String dimension) {
+        if (dimension == null || dimension.isBlank()) {
+            return null;
+        }
+        int eq = dimension.indexOf('=');
+        if (eq <= 0 || eq == dimension.length() - 1) {
+            throw new BizException(ErrorCode.TRACKING_002, "不支持的统计维度细分: " + dimension);
+        }
+        StatsDimension dim = parseDimension(dimension.substring(0, eq));
+        String value = dimension.substring(eq + 1).trim();
+        if (value.isEmpty()) {
+            throw new BizException(ErrorCode.TRACKING_002, "不支持的统计维度细分: " + dimension);
+        }
+        DimensionColumns columns = columnsOf(dim);
+        return new DimensionFilter(columns.filterColumn(), value);
     }
 
     private TrendGranularity parseGranularity(String granularity) {
@@ -149,16 +184,17 @@ public class TrackingServiceImpl implements TrackingService {
         try {
             return TrendGranularity.valueOf(granularity);
         } catch (IllegalArgumentException e) {
+            LOGGER.warn("不支持的趋势粒度: {}", granularity);
             throw new BizException(ErrorCode.TRACKING_002, "不支持的趋势粒度: " + granularity);
         }
     }
 
     private DimensionColumns columnsOf(StatsDimension dim) {
         return switch (dim) {
-            case CALLER_TYPE -> new DimensionColumns("caller_type", "caller_type");
-            case CALLER_LEVEL -> new DimensionColumns("caller_level", "caller_level");
-            case CALLER_DEPT -> new DimensionColumns("caller_dept_name", "caller_dept_code");
-            case BIZ_TYPE -> new DimensionColumns("biz_type", "biz_type");
+            case CALLER_TYPE -> new DimensionColumns("caller_type", "caller_type", "caller_type");
+            case CALLER_LEVEL -> new DimensionColumns("caller_level", "caller_level", "caller_level");
+            case CALLER_DEPT -> new DimensionColumns("caller_dept_name", "caller_dept_code", "caller_dept_code");
+            case BIZ_TYPE -> new DimensionColumns("biz_type", "biz_type", "biz_type");
         };
     }
 
@@ -210,6 +246,9 @@ public class TrackingServiceImpl implements TrackingService {
     }
 
     /** 维度列白名单映射（防 SQL 注入）。 */
-    private record DimensionColumns(String nameColumn, String groupByColumn) {
+    private record DimensionColumns(String nameColumn, String groupByColumn, String filterColumn) {
+    }
+
+    private record DimensionFilter(String column, String value) {
     }
 }

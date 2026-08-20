@@ -57,12 +57,16 @@ public interface TrackingMapper {
      * 按时间粒度聚合（折线图数据源）。
      *
      * @param timeExpr 时间格式化表达式（service 白名单映射）
+     * @param dimColumn 可选维度过滤列（service 白名单映射，为空不过滤）
+     * @param dimValue  可选维度过滤值（参数化绑定）
      * @param start    起始时间
      * @param end      截止时间
      * @return 聚合结果（time/calls/successCount）
      */
     List<Map<String, Object>> selectTrend(
             @Param("timeExpr") String timeExpr,
+            @Param("dimColumn") String dimColumn,
+            @Param("dimValue") String dimValue,
             @Param("start") LocalDateTime start,
             @Param("end") LocalDateTime end);
 

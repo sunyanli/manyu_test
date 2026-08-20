@@ -51,4 +51,15 @@ public class ExportRequest {
     public void setEndTime(String endTime) {
         this.endTime = endTime;
     }
+
+    /**
+     * 摘要字符串，供埋点入参摘要记录（F05 R03 含导出目标与格式）。
+     *
+     * @return 形如 {@code target=HELLO_WORLD,format=CSV}
+     */
+    @Override
+    public String toString() {
+        return "target=" + (target == null ? "" : target)
+                + ",format=" + (format == null ? "" : format);
+    }
 }

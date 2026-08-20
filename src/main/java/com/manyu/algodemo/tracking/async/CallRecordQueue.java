@@ -10,10 +10,11 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -53,11 +54,12 @@ public class CallRecordQueue {
         this.enabled = enabled;
         this.batchSize = batchSize;
         this.queue = new LinkedBlockingQueue<>(queueCapacity);
-        this.scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        ThreadFactory threadFactory = r -> {
             Thread t = new Thread(r, "call-record-flusher");
             t.setDaemon(true);
             return t;
-        });
+        };
+        this.scheduler = new ScheduledThreadPoolExecutor(1, threadFactory);
         if (enabled) {
             scheduler.scheduleWithFixedDelay(this::flush, flushIntervalMs, flushIntervalMs, TimeUnit.MILLISECONDS);
         }
@@ -73,7 +75,8 @@ public class CallRecordQueue {
             return;
         }
         if (!queue.offer(record)) {
-            LOGGER.warn("埋点队列已满，丢弃记录: bizType={}, callerId={}", record.getBizType(), record.getCallerId());
+            LOGGER.warn("埋点队列已满，丢弃记录: bizType={}, callerId={}",
+                    record.getBizType(), record.getCallerId());
             droppedCount.incrementAndGet();
         }
     }
@@ -107,6 +110,7 @@ public class CallRecordQueue {
             scheduler.shutdownNow();
         }
         flush();
-        LOGGER.info("埋点队列关闭，累计丢弃={}, 写失败批次数={}", droppedCount.get(), writeFailCount.get());
+        LOGGER.info("埋点队列关闭，累计丢弃={}, 写失败批次数={}",
+                droppedCount.get(), writeFailCount.get());
     }
 }

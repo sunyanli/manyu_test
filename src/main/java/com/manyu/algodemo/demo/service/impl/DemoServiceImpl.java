@@ -140,6 +140,7 @@ public class DemoServiceImpl implements DemoService {
         try {
             return SortOrder.valueOf(order);
         } catch (IllegalArgumentException e) {
+            LOGGER.warn("不支持的排序方向: {}", order);
             throw new BizException(ErrorCode.DEMO_001, "不支持的排序方向: " + order);
         }
     }

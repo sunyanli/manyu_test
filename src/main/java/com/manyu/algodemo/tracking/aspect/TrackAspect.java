@@ -55,24 +55,23 @@ public class TrackAspect {
     @Around("@annotation(trackCall)")
     public Object around(ProceedingJoinPoint joinPoint, TrackCall trackCall) throws Throwable {
         long start = System.currentTimeMillis();
-        String methodName = joinPoint.getSignature().getName();
         Object[] args = joinPoint.getArgs();
         CallerInfo caller = callContextResolver.resolve();
         try {
             Object result = joinPoint.proceed();
-            CallRecordDO record = buildRecord(trackCall.type(), caller, methodName, args, result,
+            CallRecordDO record = buildRecord(trackCall.type(), caller, args, result,
                     System.currentTimeMillis() - start, null, null);
             callRecordQueue.offer(record);
             return result;
         } catch (Throwable t) {
-            CallRecordDO record = buildRecord(trackCall.type(), caller, methodName, args, null,
+            CallRecordDO record = buildRecord(trackCall.type(), caller, args, null,
                     System.currentTimeMillis() - start, "FAIL", t.getClass().getSimpleName());
             callRecordQueue.offer(record);
             throw t;
         }
     }
 
-    private CallRecordDO buildRecord(BizType bizType, CallerInfo caller, String methodName, Object[] args,
+    private CallRecordDO buildRecord(BizType bizType, CallerInfo caller, Object[] args,
                                      Object result, long costTimeMs, String status, String errorCode) {
         CallRecordDO record = new CallRecordDO();
         record.setBizType(bizType.name());
@@ -82,41 +81,36 @@ public class TrackAspect {
         record.setCallerLevel(caller.getCallerLevel());
         record.setCallerDeptCode(caller.getCallerDeptCode());
         record.setCallerDeptName(caller.getCallerDeptName());
-        record.setReqSummary(buildReqSummary(methodName, args));
-        record.setRespSummary(status == null ? buildRespSummary(methodName, result) : null);
+        record.setReqSummary(buildReqSummary(bizType, args));
+        record.setRespSummary(status == null ? buildRespSummary(bizType, result) : null);
         record.setCostTimeMs(costTimeMs);
         record.setResultStatus(status == null ? "SUCCESS" : status);
         record.setErrorCode(errorCode);
         return record;
     }
 
-    private String buildReqSummary(String methodName, Object[] args) {
+    private String buildReqSummary(BizType bizType, Object[] args) {
         if (args == null || args.length == 0) {
             return "";
         }
-        return switch (methodName) {
-            case "hello" -> "name=" + safe(args[0]);
-            case "hash" -> "algorithm=" + safe(args[1]) + ",textBytes=" + textBytes(safe(args[0]));
-            case "bubbleSort" -> "size=" + listSize(args[0]) + ",order=" + safe(args[1])
+        return switch (bizType) {
+            case HELLO_WORLD -> "name=" + safe(args[0]);
+            case HASH -> "algorithm=" + safe(args[1]) + ",textBytes=" + textBytes(safe(args[0]));
+            case BUBBLE_SORT -> "size=" + listSize(args[0]) + ",order=" + safe(args[1])
                     + ",optimized=" + safe(args[2]);
-            case "export" -> "target=" + exportField(args[0], "target") + ",format=" + exportField(args[0], "format");
+            case EXPORT -> "target=" + exportField(args[0], "target") + ",format=" + exportField(args[0], "format");
             default -> "args=" + truncate(args[0], RESP_SUMMARY_LIMIT);
         };
     }
 
-    @SuppressWarnings("unchecked")
-    private String buildRespSummary(String methodName, Object result) {
+    private String buildRespSummary(BizType bizType, Object result) {
         if (result == null) {
             return "";
         }
-        return switch (methodName) {
-            case "hello" -> truncate(result.toString(), RESP_SUMMARY_LIMIT);
-            case "hash" -> truncate(result.toString(), HASH_PREFIX_LEN * 2 + 40);
-            case "bubbleSort" -> {
-                String sorted = truncate(result.toString(), SORT_PREFIX_LEN * 6 + 20);
-                yield sorted;
-            }
-            case "export" -> truncate(result.toString(), RESP_SUMMARY_LIMIT);
+        return switch (bizType) {
+            case HELLO_WORLD, EXPORT -> truncate(result.toString(), RESP_SUMMARY_LIMIT);
+            case HASH -> truncate(result.toString(), HASH_PREFIX_LEN + 60);
+            case BUBBLE_SORT -> truncate(result.toString(), SORT_PREFIX_LEN * 6 + 30);
             default -> truncate(result.toString(), RESP_SUMMARY_LIMIT);
         };
     }

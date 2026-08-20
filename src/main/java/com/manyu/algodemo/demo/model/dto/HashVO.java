@@ -45,4 +45,19 @@ public class HashVO {
     public void setCostTimeMs(long costTimeMs) {
         this.costTimeMs = costTimeMs;
     }
+
+    /**
+     * 摘要字符串：含算法与哈希值前 16 位，供埋点出参摘要记录（不含全文，避免超长落库）。
+     *
+     * @return 形如 {@code algorithm=SHA256,hash=b94d27b9934d3e08...,inputLength=11}
+     */
+    @Override
+    public String toString() {
+        String hashPrefix = hash == null || hash.length() <= 16 ? safe(hash) : hash.substring(0, 16) + "...";
+        return "algorithm=" + safe(algorithm) + ",hash=" + hashPrefix + ",inputLength=" + inputLength;
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value;
+    }
 }
