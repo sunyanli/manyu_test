@@ -1,0 +1,16 @@
+{
+  "task_id": "DEV-eecb99b0-9b79-11f1-a438-852be3c2a082-fea6c9db-7e0f-4099-8d47-5e4b4fceb86a",
+  "stage": "review",
+  "skill": "dtazziboot-java-code-review",
+  "blocker_count": 1,
+  "review_summary": {
+    "p0_count": 1,
+    "p1_count": 8,
+    "p2_count": 6,
+    "java_files_reviewed": 54,
+    "scan_all_rules_findings": 22,
+    "blocker": "ExportServiceImpl.java:76-87 并发信号量未获取即释放（Semaphore over-release）",
+    "merge_suggestion": "修复后合并"
+  },
+  "report_path": ".agents/20260820-分别写三个接口helloworld_哈希/cr_report.md"
+}
