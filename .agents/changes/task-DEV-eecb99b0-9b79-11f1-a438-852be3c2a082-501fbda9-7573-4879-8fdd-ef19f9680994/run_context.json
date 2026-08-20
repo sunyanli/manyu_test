@@ -9,12 +9,18 @@
     "artifacts": [
       ".agents/20260820-分别写三个接口helloworld_哈希/dima.md"
     ],
-    "summary": "已通览两仓现状：[manyu_test] 仅有可复用的 bubble_sort.py 冒泡排序实现，无 Web 框架；[manyu_test1] 为空仓。需求拆解为 R1 三接口、R2 前端三 Tab 页面、R3 导出、R4 埋点+报表可视化，产出澄清文档 dima.md（含接口契约草案与跨仓对齐点）。",
+    "summary": "复核两仓现状：[manyu_test] 仅 bubble_sort.py（标准/优化/降序三版冒泡排序）可复用，无 Web 框架与依赖清单；[manyu_test1] 仅 README 的空仓，前端需从零初始化。需求拆解为 R1 三接口（helloworld/哈希/冒泡排序）、R2 前端单页三 Tab 展示、R3 导出按钮+后端导出接口、R4 埋点（调用次数+调用人）+ 前端报表（人员类型/层级/部门维度 × 折线/饼图/柱状图）。dima.md 已含需求拆解、跨仓现状、接口契约草案与对齐点；本轮为其第 5 节 Q1–Q4 补齐“建议默认”（与 plan.md 既有自主裁定对齐），并就 Q1–Q4 向用户发起带推荐项的确认，等待答复。",
     "open_questions": [
       "Q1 仓库分工与技术栈选型（后端框架/前端框架）",
-      "Q2 哈希算法范围（SHA-256 单算法 vs MD5/SHA-1/SHA-256 可选）",
+      "Q2 哈希算法范围（SHA-256 单算法 vs MD5/SHA-1/SHA-256/SHA-512 可选）",
       "Q3 导出文件格式（CSV/Excel/JSON）",
       "Q4 调用人身份与人员类型/层级/部门属性的数据来源（现有用户体系 vs 请求头自报+mock 用户表）"
-    ]
+    ],
+    "defaults_if_no_answer": {
+      "Q1": "后端 Python + FastAPI + SQLite（[manyu_test]，复用既有 bubble_sort.py）；前端 React + Vite + AntD + ECharts（[manyu_test1]）",
+      "Q2": "支持 md5 / sha1 / sha256 / sha512，默认 sha256",
+      "Q3": "CSV（默认，带 BOM 便于 Excel 打开）与 JSON 两种，由 format 参数选择；不引入 Excel 库",
+      "Q4": "X-User-Id 请求头自报 + 仓内 mock 用户表（u001..u004，含人员类型/层级/部门）补全维度；缺失按匿名兜底（演示级可信度，风险已在 dima.md 第 6 节声明）"
+    }
   }
 }
