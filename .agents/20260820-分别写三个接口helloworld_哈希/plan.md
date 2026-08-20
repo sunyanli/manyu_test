@@ -20,7 +20,7 @@
 
 ## Global Constraints
 
-- 两仓只允许在各自任务分支上提交；禁止 push / force / 改基线。执行者仅做 `git add` + `git commit`。
+- **Git 只读（流水线硬性约束）**：禁止所有 Git 写操作（commit/push/merge/reset/rebase/checkout 等），仅允许 `git status/log/diff/show` 等只读命令；两仓均不做任何提交动作，版本化由流水线平台统一接管。各任务收尾步骤仅执行 `git status --short` 只读核对变更范围。
 - **API 契约冻结表**（前后端唯一对齐基准，后续任务不得单方面变更路径与出入参形状）：
 
 | 接口 | 方法/路径 | 入参 | 出参 |
@@ -326,12 +326,13 @@ app = create_app()
 Run: `python3 -m pytest tests/test_api.py -v`
 Expected: PASS，`1 passed`。
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: 变更只读核对（流水线禁止 Git 写操作）**
 
 ```bash
 cd [manyu_test]仓根
-git add requirements.txt pytest.ini app tests
-git commit -m "feat(backend): scaffold FastAPI app with health endpoint and sqlite schema"
+# 流水线禁止 git add/commit 等写操作，版本化由平台统一接管；此处仅只读核对变更范围
+git status --short
+git diff --stat
 ```
 
 ---
@@ -454,12 +455,13 @@ def resolve_user(user_id):
 Run: `python3 -m pytest tests/test_users.py -v`
 Expected: PASS，`4 passed`。
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: 变更只读核对（流水线禁止 Git 写操作）**
 
 ```bash
 cd [manyu_test]仓根
-git add data/users.json app/users.py tests/test_users.py
-git commit -m "feat(backend): add mock user table and caller attribute resolution"
+# 流水线禁止 git add/commit 等写操作，版本化由平台统一接管；此处仅只读核对变更范围
+git status --short
+git diff --stat
 ```
 
 ---
@@ -637,12 +639,13 @@ from .routers import business
 Run: `python3 -m pytest tests/test_hello.py tests/test_api.py -v`
 Expected: PASS，`5 passed`。
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: 变更只读核对（流水线禁止 Git 写操作）**
 
 ```bash
 cd [manyu_test]仓根
-git add app/tracking.py app/services app/routers app/main.py tests/test_hello.py
-git commit -m "feat(backend): add unified call tracking and GET /api/hello"
+# 流水线禁止 git add/commit 等写操作，版本化由平台统一接管；此处仅只读核对变更范围
+git status --short
+git diff --stat
 ```
 
 ---
@@ -768,12 +771,13 @@ def hash_digest(request: Request, payload: HashRequest):
 Run: `python3 -m pytest tests/test_hash.py tests/test_hello.py -v`
 Expected: PASS，`8 passed`（无回归）。
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: 变更只读核对（流水线禁止 Git 写操作）**
 
 ```bash
 cd [manyu_test]仓根
-git add app/schemas.py app/services/hash_service.py app/routers/business.py tests/test_hash.py
-git commit -m "feat(backend): add POST /api/hash with md5/sha1/sha256/sha512"
+# 流水线禁止 git add/commit 等写操作，版本化由平台统一接管；此处仅只读核对变更范围
+git status --short
+git diff --stat
 ```
 
 ---
@@ -907,12 +911,13 @@ def bubble_sort(request: Request, payload: BubbleSortRequest):
 Run: `python3 -m pytest tests/test_bubble.py -v`
 Expected: PASS，`6 passed`。
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: 变更只读核对（流水线禁止 Git 写操作）**
 
 ```bash
 cd [manyu_test]仓根
-git add app/services/bubble.py app/routers/business.py tests/test_bubble.py
-git commit -m "feat(backend): add POST /api/bubble-sort reusing bubble_sort.py"
+# 流水线禁止 git add/commit 等写操作，版本化由平台统一接管；此处仅只读核对变更范围
+git status --short
+git diff --stat
 ```
 
 ---
@@ -1059,12 +1064,13 @@ from .routers import business, export
 Run: `python3 -m pytest tests/test_export.py -v`
 Expected: PASS，`5 passed`。
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: 变更只读核对（流水线禁止 Git 写操作）**
 
 ```bash
 cd [manyu_test]仓根
-git add app/routers/export.py app/main.py tests/test_export.py
-git commit -m "feat(backend): add GET /api/export for per-tab csv/json download"
+# 流水线禁止 git add/commit 等写操作，版本化由平台统一接管；此处仅只读核对变更范围
+git status --short
+git diff --stat
 ```
 
 ---
@@ -1228,12 +1234,13 @@ Expected: PASS，`6 passed`。
 Run: `python3 -m pytest`
 Expected: PASS，全部通过（约 `26 passed`：health 1 + users 4 + hello 4 + hash 4 + bubble 6 + export 5 + metrics 6，± 以实际为准），退出码 0。
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: 变更只读核对（流水线禁止 Git 写操作）**
 
 ```bash
 cd [manyu_test]仓根
-git add app/routers/metrics.py app/main.py tests/test_metrics.py
-git commit -m "feat(backend): add GET /api/metrics aggregating call logs by user dimensions and day"
+# 流水线禁止 git add/commit 等写操作，版本化由平台统一接管；此处仅只读核对变更范围
+git status --short
+git diff --stat
 ```
 
 ---
@@ -1361,12 +1368,13 @@ Expected: 退出码 0，生成 `node_modules/` 与 `package-lock.json`。（依�
 Run: `npm run build`
 Expected: 退出码 0，生成 `dist/index.html` 与 `dist/assets/*.js`。
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: 变更只读核对（流水线禁止 Git 写操作）**
 
 ```bash
 cd [manyu_test1]仓根
-git add package.json package-lock.json vite.config.js index.html src
-git commit -m "feat(frontend): scaffold Vite + React + AntD app with /api proxy"
+# 流水线禁止 git add/commit 等写操作，版本化由平台统一接管；此处仅只读核对变更范围
+git status --short
+git diff --stat
 ```
 
 ---
@@ -1722,12 +1730,13 @@ export default function App() {
 Run: `npm run build`
 Expected: 退出码 0，`dist/` 更新。
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 8: 变更只读核对（流水线禁止 Git 写操作）**
 
 ```bash
 cd [manyu_test1]仓根
-git add src
-git commit -m "feat(frontend): add three tabs invoking hello/hash/bubble-sort APIs"
+# 流水线禁止 git add/commit 等写操作，版本化由平台统一接管；此处仅只读核对变更范围
+git status --short
+git diff --stat
 ```
 
 ---
@@ -1796,12 +1805,13 @@ import { api, exportTab } from '../api/client.js'
 Run: `npm run build`
 Expected: 退出码 0。
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: 变更只读核对（流水线禁止 Git 写操作）**
 
 ```bash
 cd [manyu_test1]仓根
-git add src/api/client.js src/components
-git commit -m "feat(frontend): add per-tab export buttons downloading results from /api/export"
+# 流水线禁止 git add/commit 等写操作，版本化由平台统一接管；此处仅只读核对变更范围
+git status --short
+git diff --stat
 ```
 
 ---
@@ -2003,12 +2013,13 @@ import MetricsPanel from './components/MetricsPanel.jsx'
 Run: `npm run build`
 Expected: 退出码 0。
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: 变更只读核对（流水线禁止 Git 写操作）**
 
 ```bash
 cd [manyu_test1]仓根
-git add src/charts src/components/MetricsPanel.jsx src/App.jsx
-git commit -m "feat(frontend): add metrics panel with dimension switch and line/pie/bar charts"
+# 流水线禁止 git add/commit 等写操作，版本化由平台统一接管；此处仅只读核对变更范围
+git status --short
+git diff --stat
 ```
 
 ---
@@ -2117,16 +2128,15 @@ npm run build # 产物 dist/
 需先启动后端 manyu_test 服务（端口 8000）。页面右上角可切换调用人（u001..u004 / 匿名），用于演示埋点报表维度。
 ```
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: 变更只读核对（流水线禁止 Git 写操作）**
 
 ```bash
 cd [manyu_test]仓根
-git add README.md
-git commit -m "docs(backend): add run/test/api guide"
+# 流水线禁止 git add/commit 等写操作，版本化由平台统一接管；此处仅只读核对两仓变更范围
+git status --short
 
 cd [manyu_test1]仓根
-git add README.md
-git commit -m "docs(frontend): add run/test/build guide"
+git status --short
 ```
 
 ---
@@ -2158,3 +2168,4 @@ git commit -m "docs(frontend): add run/test/build guide"
 2. **占位符扫描**：无 TBD/TODO/“类似 Task N”；所有代码步骤均给出完整代码或精确定位的修改片段。
 3. **类型一致性**：`execute_tracked(api, user_id, request_payload, handler)` 在 Task 3 定义、Task 4/5 原样复用；`data.labels/series/total` 在 Task 7 与 Task 11 一致；`tab` 枚举（hello/hash/bubble）在 Task 6/10 一致；`X-User-Id` 大小写在两端一致。
 4. **修正**：已移除草稿中 Task 5 测试的一行冗余占位断言，`test_bubble_tracked` 仅保留真实断言。
+5. **合规修正（loop-1 实施计划阶段）**：按流水线硬性约束将 Global Constraints 中的“执行者仅做 git add + git commit”改为 **Git 只读**；Task 1–12 原 12 个 Commit 收尾步骤全部替换为 `git status --short` / `git diff --stat` 只读核对，版本化由流水线平台统一接管。其余任务内容、接口契约与文件结构保持不变。
