@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manyu.algodemo.tracking.dao.TrackingMapper">
+
+    <sql id="baseColumns">
+        id, biz_type, caller_id, caller_name, caller_type, caller_level,
+        caller_dept_code, caller_dept_name, req_summary, resp_summary,
+        cost_time_ms, result_status, error_code, gmt_create, gmt_modified
+    </sql>
+
+    <insert id="batchInsert" parameterType="list">
+        INSERT INTO call_record (
+            biz_type, caller_id, caller_name, caller_type, caller_level,
+            caller_dept_code, caller_dept_name, req_summary, resp_summary,
+            cost_time_ms, result_status, error_code
+        ) VALUES
+        <foreach collection="records" item="item" separator=",">
+            (
+            #{item.bizType}, #{item.callerId}, #{item.callerName}, #{item.callerType}, #{item.callerLevel},
+            #{item.callerDeptCode}, #{item.callerDeptName}, #{item.reqSummary}, #{item.respSummary},
+            #{item.costTimeMs}, #{item.resultStatus}, #{item.errorCode}
+            )
+        </foreach>
+    </insert>
+
+    <select id="selectOverview" resultType="map">
+        SELECT COUNT(*)                                  AS totalCalls,
+               COUNT(DISTINCT caller_id)                 AS totalCallers,
+               SUM(CASE WHEN result_status = 'SUCCESS' THEN 1 ELSE 0 END) AS successCount,
+               COALESCE(AVG(cost_time_ms), 0)            AS avgCostTimeMs
+        FROM call_record
+        WHERE gmt_create &gt;= #{start}
+          AND gmt_create &lt;= #{end}
+    </select>
+
+    <select id="selectTopCaller" resultType="map">
+        SELECT caller_name AS name, COUNT(*) AS calls
+        FROM call_record
+        WHERE gmt_create &gt;= #{start}
+          AND gmt_create &lt;= #{end}
+        GROUP BY caller_id, caller_name
+        ORDER BY calls DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectStatsByDimension" resultType="map">
+        SELECT MAX(${dimColumn}) AS name, COUNT(*) AS value
+        FROM call_record
+        WHERE gmt_create &gt;= #{start}
+          AND gmt_create &lt;= #{end}
+        GROUP BY ${groupBy}
+        ORDER BY value DESC
+    </select>
+
+    <select id="selectTrend" resultType="map">
+        SELECT ${timeExpr} AS time,
+               COUNT(*) AS calls,
+               SUM(CASE WHEN result_status = 'SUCCESS' THEN 1 ELSE 0 END) AS successCount
+        FROM call_record
+        WHERE gmt_create &gt;= #{start}
+          AND gmt_create &lt;= #{end}
+        GROUP BY time
+        ORDER BY time ASC
+    </select>
+
+    <select id="selectRecentRecords" resultType="com.manyu.algodemo.tracking.model.entity.CallRecordDO">
+        SELECT
+            id, biz_type, caller_id, caller_name, caller_type, caller_level,
+            caller_dept_code, caller_dept_name, req_summary, resp_summary,
+            cost_time_ms, result_status, error_code, gmt_create, gmt_modified
+        FROM call_record
+        WHERE biz_type = #{bizType}
+          AND gmt_create &gt;= #{start}
+          AND gmt_create &lt;= #{end}
+        ORDER BY gmt_create DESC, id DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

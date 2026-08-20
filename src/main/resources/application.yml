@@ -1,0 +1,42 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: algo-demo
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/algo_demo?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+tracking:
+  enabled: true
+  # 埋点异步批量写参数
+  queue-capacity: 10000
+  batch-size: 500
+  flush-interval-ms: 200
+  core-pool-size: 2
+  max-pool-size: 4
+
+export:
+  enabled: true
+  max-concurrency: 5
+  # 页面导出默认最近 N 条调用记录
+  page-record-limit: 100
+
+demo:
+  sort:
+    # 冒泡排序 O(n^2) 输入规模上界
+    max-size: 10000
+  hash:
+    # 入参文本 UTF-8 字节上界
+    max-text-bytes: 4096
