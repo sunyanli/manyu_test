@@ -1,21 +1,39 @@
 {
-  "blocker_count": 2,
+  "blocker_count": 5,
   "blockers": [
     {
-      "id": "B-01",
+      "id": "P0-01",
       "file": "ExportServiceImpl.java",
       "description": "导出使用硬编码测试数据，非实际用户结果",
       "severity": "blocker"
     },
     {
-      "id": "B-02",
+      "id": "P0-02",
       "file": "CallRecordMapper.xml",
       "description": "部门维度统计显示数字ID而非部门名称",
       "severity": "blocker"
+    },
+    {
+      "id": "P0-03",
+      "file": "WebConfig.java",
+      "description": "CORS配置allowedOriginPatterns(*)与allowCredentials(true)冲突，浏览器拒绝",
+      "severity": "blocker"
+    },
+    {
+      "id": "P0-04",
+      "file": "TrackingAspect.java",
+      "description": "埋点AOP切面仅拦截AlgorithmController，未覆盖ExportController",
+      "severity": "blocker"
+    },
+    {
+      "id": "P0-05",
+      "file": "AlgorithmServiceImpl.java",
+      "description": "哈希算法input.getBytes()使用平台默认字符集，跨环境不一致",
+      "severity": "blocker"
     }
   ],
-  "major_issues": 2,
-  "minor_issues": 2,
-  "overall_rating": "PASS_WITH_BLOCKERS",
-  "review_timestamp": "2026-08-24T13:50:00Z"
+  "major_issues": 4,
+  "minor_issues": 5,
+  "overall_rating": "DO_NOT_MERGE",
+  "review_timestamp": "2026-08-24T14:00:00Z"
 }
