@@ -1,0 +1,21 @@
+{
+  "blocker_count": 2,
+  "blockers": [
+    {
+      "id": "B-01",
+      "file": "ExportServiceImpl.java",
+      "description": "导出使用硬编码测试数据，非实际用户结果",
+      "severity": "blocker"
+    },
+    {
+      "id": "B-02",
+      "file": "CallRecordMapper.xml",
+      "description": "部门维度统计显示数字ID而非部门名称",
+      "severity": "blocker"
+    }
+  ],
+  "major_issues": 2,
+  "minor_issues": 2,
+  "overall_rating": "PASS_WITH_BLOCKERS",
+  "review_timestamp": "2026-08-24T13:50:00Z"
+}
