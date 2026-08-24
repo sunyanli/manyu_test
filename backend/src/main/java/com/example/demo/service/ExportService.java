@@ -65,7 +65,7 @@ public class ExportService {
                     .map(Integer::parseInt)
                     .collect(Collectors.toList());
         } catch (NumberFormatException e) {
-            return Arrays.asList(5, 3, 8, 1, 2);
+            throw new IllegalArgumentException("数组格式无效，请使用逗号分隔的数字，例如: 5,3,8,1,2", e);
         }
     }
 
@@ -101,8 +101,8 @@ public class ExportService {
              CSVWriter writer = new CSVWriter(osw)) {
             writer.writeNext(new String[]{"originalArray", "sortedArray", "swapCount", "comparisonCount"});
             writer.writeNext(new String[]{
-                    result.getOriginalArray().toString(),
-                    result.getSortedArray().toString(),
+                    result.getOriginalArray().stream().map(String::valueOf).collect(Collectors.joining(",")),
+                    result.getSortedArray().stream().map(String::valueOf).collect(Collectors.joining(",")),
                     String.valueOf(result.getSwapCount()),
                     String.valueOf(result.getComparisonCount())
             });
@@ -156,8 +156,8 @@ public class ExportService {
             header.createCell(2).setCellValue("swapCount");
             header.createCell(3).setCellValue("comparisonCount");
             Row row = sheet.createRow(1);
-            row.createCell(0).setCellValue(result.getOriginalArray().toString());
-            row.createCell(1).setCellValue(result.getSortedArray().toString());
+            row.createCell(0).setCellValue(result.getOriginalArray().stream().map(String::valueOf).collect(Collectors.joining(",")));
+            row.createCell(1).setCellValue(result.getSortedArray().stream().map(String::valueOf).collect(Collectors.joining(",")));
             row.createCell(2).setCellValue(result.getSwapCount());
             row.createCell(3).setCellValue(result.getComparisonCount());
             ByteArrayOutputStream out = new ByteArrayOutputStream();

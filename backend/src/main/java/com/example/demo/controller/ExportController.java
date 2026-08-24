@@ -35,18 +35,24 @@ public class ExportController {
             filename = type + "_export.csv";
         }
 
-        switch (type) {
-            case "hello":
-                data = exportService.exportHello(name, format);
-                break;
-            case "hash":
-                data = exportService.exportHash(input, algorithm, format);
-                break;
-            case "bubble":
-                data = exportService.exportBubble(array, format);
-                break;
-            default:
-                return ResponseEntity.badRequest().build();
+        try {
+            switch (type) {
+                case "hello":
+                    data = exportService.exportHello(name, format);
+                    break;
+                case "hash":
+                    data = exportService.exportHash(input, algorithm, format);
+                    break;
+                case "bubble":
+                    data = exportService.exportBubble(array, format);
+                    break;
+                default:
+                    return ResponseEntity.badRequest().build();
+            }
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .header(HttpHeaders.CONTENT_TYPE, "text/plain; charset=UTF-8")
+                    .body(e.getMessage().getBytes(java.nio.charset.StandardCharsets.UTF_8));
         }
 
         return ResponseEntity.ok()

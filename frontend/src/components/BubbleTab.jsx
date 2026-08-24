@@ -17,6 +17,11 @@ function BubbleTab() {
         message.warning('请输入有效的数字数组，例如: 5, 3, 8, 1, 2');
         return;
       }
+      // 校验所有元素均为数字
+      if (!array.every(item => typeof item === 'number' && !isNaN(item))) {
+        message.warning('数组元素必须为数字，例如: 5, 3, 8, 1, 2');
+        return;
+      }
     } catch {
       message.warning('请输入有效的数字数组，例如: 5, 3, 8, 1, 2');
       return;
