@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.algorithmdemo.dao.mapper.CallRecordMapper">
+
+    <resultMap id="BaseResultMap" type="com.example.algorithmdemo.model.entity.CallRecord">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="user_name" property="userName"/>
+        <result column="user_type" property="userType"/>
+        <result column="user_level" property="userLevel"/>
+        <result column="user_dept_id" property="userDeptId"/>
+        <result column="api_name" property="apiName"/>
+        <result column="call_result" property="callResult"/>
+        <result column="call_time" property="callTime"/>
+        <result column="gmt_create" property="gmtCreate"/>
+        <result column="gmt_modified" property="gmtModified"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, user_id, user_name, user_type, user_level, user_dept_id,
+        api_name, call_result, call_time, gmt_create, gmt_modified
+    </sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO call_record (user_id, user_name, user_type, user_level, user_dept_id,
+                                 api_name, call_result, call_time, gmt_create, gmt_modified)
+        VALUES (#{userId}, #{userName}, #{userType}, #{userLevel}, #{userDeptId},
+                #{apiName}, #{callResult}, #{callTime}, NOW(), NOW())
+    </insert>
+
+    <select id="countByDimension" resultType="java.util.Map">
+        SELECT
+            CASE
+                WHEN #{dimension} = 'user_type' THEN user_type
+                WHEN #{dimension} = 'user_level' THEN user_level
+                WHEN #{dimension} = 'user_dept' THEN CAST(user_dept_id AS CHAR)
+            END AS label,
+            COUNT(*) AS count
+        FROM call_record
+        GROUP BY label
+        ORDER BY count DESC
+    </select>
+
+    <select id="countByTimeRange" resultType="java.util.Map">
+        SELECT
+            DATE_FORMAT(call_time, '%Y-%m-%d') AS label,
+            COUNT(*) AS count
+        FROM call_record
+        <where>
+            <if test="startTime != null and startTime != ''">
+                AND call_time >= #{startTime}
+            </if>
+            <if test="endTime != null and endTime != ''">
+                AND call_time &lt;= #{endTime}
+            </if>
+        </where>
+        GROUP BY label
+        ORDER BY label ASC
+    </select>
+
+    <select id="selectList" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM call_record
+        <where>
+            <if test="apiName != null and apiName != ''">
+                AND api_name = #{apiName}
+            </if>
+            <if test="startTime != null and startTime != ''">
+                AND call_time >= #{startTime}
+            </if>
+            <if test="endTime != null and endTime != ''">
+                AND call_time &lt;= #{endTime}
+            </if>
+        </where>
+        ORDER BY id DESC
+        LIMIT #{limit} OFFSET #{offset}
+    </select>
+
+    <select id="countTotal" resultType="long">
+        SELECT COUNT(*)
+        FROM call_record
+        <where>
+            <if test="apiName != null and apiName != ''">
+                AND api_name = #{apiName}
+            </if>
+            <if test="startTime != null and startTime != ''">
+                AND call_time >= #{startTime}
+            </if>
+            <if test="endTime != null and endTime != ''">
+                AND call_time &lt;= #{endTime}
+            </if>
+        </where>
+    </select>
+
+</mapper>
