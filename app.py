@@ -5,13 +5,14 @@
 提供核心接口（helloworld、哈希、冒泡排序）、埋点追踪、统计查询、导出功能。
 """
 
+import csv
 import hashlib
 import io
 import json
 import os
 import sqlite3
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import FastAPI, Query, Request
@@ -29,7 +30,6 @@ app = FastAPI(title="三接口演示服务")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -98,7 +98,7 @@ async def helloworld(request: Request):
             "success": True,
             "data": {
                 "message": "Hello World!",
-                "timestamp": datetime.utcnow().isoformat() + "Z"
+                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
             }
         }
     except Exception:
@@ -180,19 +180,18 @@ async def track_event(request: Request, event: TrackEventRequest):
         })
     try:
         event_id = str(uuid.uuid4())
-        ts = datetime.utcnow().isoformat() + "Z"
-        conn = sqlite3.connect(DB_PATH)
-        conn.execute(
-            "INSERT INTO track_events (event_id, api_name, caller, person_type, person_level, person_department, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (event_id, event.api_name, event.caller, event.person_type, event.person_level, event.person_department, ts)
-        )
-        conn.commit()
-        conn.close()
+        ts = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute(
+                "INSERT INTO track_events (event_id, api_name, caller, person_type, person_level, person_department, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (event_id, event.api_name, event.caller, event.person_type, event.person_level, event.person_department, ts)
+            )
+            conn.commit()
         return {"success": True, "data": {"event_id": event_id, "timestamp": ts}}
     except Exception:
         raise HTTPException(status_code=500, detail={
             "success": False,
-            "error_code": "ERR_TRK_001",
+            "error_code": "ERR_TRK_002",
             "message": "上报事件数据不完整，请检查后重试",
             "detail": None
         })
@@ -204,27 +203,26 @@ async def track_event(request: Request, event: TrackEventRequest):
 @app.get("/api/track/stats")
 async def track_stats(request: Request, dimension: str = Query("type", description="聚合维度: type|level|department|time")):
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        dim_map = {
-            "type": "person_type",
-            "level": "person_level",
-            "department": "person_department"
-        }
-        if dimension == "time":
-            rows = conn.execute(
-                "SELECT DATE(timestamp) as date, COUNT(*) as count FROM track_events GROUP BY DATE(timestamp) ORDER BY date"
-            ).fetchall()
-            entries = [{"name": r["date"], "count": r["count"]} for r in rows]
-        elif dimension in dim_map:
-            col = dim_map[dimension]
-            rows = conn.execute(
-                f"SELECT {col} as name, COUNT(*) as count FROM track_events GROUP BY {col} ORDER BY count DESC"
-            ).fetchall()
-            entries = [{"name": r["name"], "count": r["count"]} for r in rows]
-        else:
-            entries = []
-        conn.close()
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            dim_map = {
+                "type": "person_type",
+                "level": "person_level",
+                "department": "person_department"
+            }
+            if dimension == "time":
+                rows = conn.execute(
+                    "SELECT DATE(timestamp) as date, COUNT(*) as count FROM track_events GROUP BY DATE(timestamp) ORDER BY date"
+                ).fetchall()
+                entries = [{"name": r["date"], "count": r["count"]} for r in rows]
+            elif dimension in dim_map:
+                col = dim_map[dimension]
+                rows = conn.execute(
+                    f"SELECT {col} as name, COUNT(*) as count FROM track_events GROUP BY {col} ORDER BY count DESC"
+                ).fetchall()
+                entries = [{"name": r["name"], "count": r["count"]} for r in rows]
+            else:
+                entries = []
         return {"success": True, "data": {"dimension": dimension, "entries": entries}}
     except Exception:
         raise HTTPException(status_code=500, detail={
@@ -249,12 +247,11 @@ async def export_data(request: Request, tab: str = Query(None, description="导�
         })
     try:
         output = io.StringIO()
-        import csv
         writer = csv.writer(output)
 
         if tab == "helloworld":
             writer.writerow(["接口", "消息", "时间戳"])
-            writer.writerow(["helloworld", "Hello World!", datetime.utcnow().isoformat() + "Z"])
+            writer.writerow(["helloworld", "Hello World!", datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")])
         elif tab == "hash":
             writer.writerow(["接口", "算法", "输入", "哈希值"])
             writer.writerow(["hash", "SHA256", "示例文本", hashlib.sha256("示例文本".encode()).hexdigest()])
@@ -270,7 +267,7 @@ async def export_data(request: Request, tab: str = Query(None, description="导�
             })
 
         output.seek(0)
-        filename = f"{tab}_export_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
+        filename = f"{tab}_export_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
         return StreamingResponse(
             iter([output.getvalue()]),
             media_type="text/csv",
