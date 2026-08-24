@@ -32,8 +32,8 @@
       "severity": "blocker"
     }
   ],
-  "major_issues": 4,
+  "major_issues": 5,
   "minor_issues": 5,
   "overall_rating": "DO_NOT_MERGE",
-  "review_timestamp": "2026-08-24T14:00:00Z"
+  "review_timestamp": "2026-08-24T14:30:00Z"
 }
