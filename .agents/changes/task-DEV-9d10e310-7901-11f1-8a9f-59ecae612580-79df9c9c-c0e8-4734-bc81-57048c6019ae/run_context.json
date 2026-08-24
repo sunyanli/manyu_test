@@ -6,6 +6,25 @@
   "timestamp": "2026-08-24T00:00:00Z",
   "status": "clarified",
   "summary": "需求澄清完成",
+  "step_review": {
+    "step": "需求澄清",
+    "review_result": "通过",
+    "review_notes": "需求文档 dima.md 已完整覆盖核心功能：员工 CRUD、单条/批量导入、成本预算管理、白名单机制。架构设计（前后端分离：manyu_test 后端 FastAPI + manyu_test1 前端 Vue 3）已明确。数据模型设计（employees/budgets/whitelist 三张表）和 API 接口契约已定义。待确认项已记录为可迭代细化。",
+    "checked_items": [
+      "员工基本信息管理（CRUD）— 已设计完整 API 和数据模型",
+      "数据导入（单条录入 + 批量 CSV/Excel 导入）— 已设计导入服务和模板下载",
+      "成本预算管理 — 已设计预算 CRUD 及关联员工",
+      "白名单机制 — 已设计支持 import/budget/all 三种类型",
+      "跨仓架构 — 已明确 manyu_test（后端）和 manyu_test1（前端）的职责划分",
+      "接口契约 — 已定义所有 API 路径、请求/响应格式"
+    ],
+    "pending_issues": [
+      "导入文件格式：CSV 为主，Excel 支持待确认",
+      "成本预算审批流程：当前为直接 CRUD，无审批环节",
+      "白名单权限层级：当前为简单启用/禁用，无多层权限",
+      "前端 UI 风格偏好：默认使用 Element Plus 风格"
+    ]
+  },
   "confirmed_decisions": [
     {
       "item": "技术栈",
@@ -31,14 +50,22 @@
       "item": "仓库分配",
       "decision": "manyu_test → 后端, manyu_test1 → 前端",
       "source": "根据仓库现状分配"
+    },
+    {
+      "item": "导入格式",
+      "decision": "CSV 为主要导入格式，前端可扩展支持 .xlsx",
+      "source": "设计文档默认"
+    },
+    {
+      "item": "白名单类型",
+      "decision": "支持 import（导入）/ budget（预算）/ all（全部）三种类型",
+      "source": "设计文档默认"
     }
   ],
   "pending_decisions": [
-    "员工基本信息具体字段列表（可在迭代中细化）",
-    "导入文件格式（CSV/Excel/两者皆支持）",
-    "成本预算的审批流程",
-    "白名单的权限层级",
-    "前端 UI 风格偏好"
+    "成本预算的审批流程（当前为直接 CRUD，无审批环节）",
+    "白名单的权限层级（当前为简单启用/禁用）",
+    "前端 UI 风格偏好（默认使用 Element Plus 风格，后续可调整）"
   ],
   "output_artifacts": [
     ".agents/20260824-开发一个人员看板_有入口记录员工的基本信/dima.md"
