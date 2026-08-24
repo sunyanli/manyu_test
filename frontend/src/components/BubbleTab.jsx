@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Input, Button, Card, message, Spin, Typography, Tag, List } from 'antd';
+import { Input, Button, Card, message, Spin, Typography, Tag } from 'antd';
 import { callBubbleSort } from '../services/api';
 
-const { TextArea } = Input;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 function BubbleTab() {
   const [arrayInput, setArrayInput] = useState('');

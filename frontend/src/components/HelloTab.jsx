@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { Input, Button, Card, message, Spin, Typography } from 'antd';
 import { callHello } from '../services/api';
 
-const { TextArea } = Input;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 function HelloTab() {
   const [name, setName] = useState('');

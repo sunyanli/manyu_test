@@ -1,5 +1,6 @@
 package com.example.demo.controller;
 
+import com.example.demo.annotation.Traceable;
 import com.example.demo.dto.AnalyticsResponse;
 import com.example.demo.dto.ApiResponse;
 import com.example.demo.service.AnalyticsService;
@@ -17,6 +18,7 @@ public class AnalyticsController {
     private AnalyticsService analyticsService;
 
     @GetMapping("/summary")
+    @Traceable(apiName = "analytics")
     public ApiResponse<AnalyticsResponse> getSummary(
             @RequestParam(defaultValue = "personType") String dimension,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,

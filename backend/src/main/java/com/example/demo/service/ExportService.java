@@ -14,6 +14,7 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class ExportService {
@@ -27,54 +28,89 @@ public class ExportService {
     @Autowired
     private BubbleService bubbleService;
 
-    public byte[] exportHello(String format) {
-        HelloResult result = helloService.greet("Sample");
+    public byte[] exportHello(String name, String format) {
+        HelloResult result = helloService.greet(name != null ? name : "World");
         if ("xlsx".equalsIgnoreCase(format)) {
             return exportHelloExcel(result);
         }
         return exportHelloCsv(result);
     }
 
-    public byte[] exportHash(String format) {
-        HashResult result = hashService.computeHash("sample-data", "SHA-256");
+    public byte[] exportHash(String input, String algorithm, String format) {
+        HashResult result = hashService.computeHash(
+                input != null ? input : "sample-data",
+                algorithm != null ? algorithm : "SHA-256");
         if ("xlsx".equalsIgnoreCase(format)) {
             return exportHashExcel(result);
         }
         return exportHashCsv(result);
     }
 
-    public byte[] exportBubble(String format) {
-        BubbleResult result = bubbleService.sort(Arrays.asList(5, 3, 8, 1, 2));
+    public byte[] exportBubble(String arrayStr, String format) {
+        List<Integer> array = parseArray(arrayStr);
+        BubbleResult result = bubbleService.sort(array);
         if ("xlsx".equalsIgnoreCase(format)) {
             return exportBubbleExcel(result);
         }
         return exportBubbleCsv(result);
     }
 
+    private List<Integer> parseArray(String arrayStr) {
+        if (arrayStr == null || arrayStr.isBlank()) {
+            return Arrays.asList(5, 3, 8, 1, 2);
+        }
+        try {
+            return Arrays.stream(arrayStr.split(","))
+                    .map(String::trim)
+                    .map(Integer::parseInt)
+                    .collect(Collectors.toList());
+        } catch (NumberFormatException e) {
+            return Arrays.asList(5, 3, 8, 1, 2);
+        }
+    }
+
     private byte[] exportHelloCsv(HelloResult result) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("greeting\n");
-        sb.append(result.getGreeting()).append("\n");
-        return sb.toString().getBytes(StandardCharsets.UTF_8);
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+             OutputStreamWriter osw = new OutputStreamWriter(baos, StandardCharsets.UTF_8);
+             CSVWriter writer = new CSVWriter(osw)) {
+            writer.writeNext(new String[]{"greeting"});
+            writer.writeNext(new String[]{result.getGreeting()});
+            writer.flush();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("CSV 导出失败", e);
+        }
     }
 
     private byte[] exportHashCsv(HashResult result) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("input,algorithm,hash\n");
-        sb.append(result.getInput()).append(",")
-          .append(result.getAlgorithm()).append(",")
-          .append(result.getHash()).append("\n");
-        return sb.toString().getBytes(StandardCharsets.UTF_8);
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+             OutputStreamWriter osw = new OutputStreamWriter(baos, StandardCharsets.UTF_8);
+             CSVWriter writer = new CSVWriter(osw)) {
+            writer.writeNext(new String[]{"input", "algorithm", "hash"});
+            writer.writeNext(new String[]{result.getInput(), result.getAlgorithm(), result.getHash()});
+            writer.flush();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("CSV 导出失败", e);
+        }
     }
 
     private byte[] exportBubbleCsv(BubbleResult result) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("originalArray,sortedArray,swapCount,comparisonCount\n");
-        sb.append(result.getOriginalArray()).append(",")
-          .append(result.getSortedArray()).append(",")
-          .append(result.getSwapCount()).append(",")
-          .append(result.getComparisonCount()).append("\n");
-        return sb.toString().getBytes(StandardCharsets.UTF_8);
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+             OutputStreamWriter osw = new OutputStreamWriter(baos, StandardCharsets.UTF_8);
+             CSVWriter writer = new CSVWriter(osw)) {
+            writer.writeNext(new String[]{"originalArray", "sortedArray", "swapCount", "comparisonCount"});
+            writer.writeNext(new String[]{
+                    result.getOriginalArray().toString(),
+                    result.getSortedArray().toString(),
+                    String.valueOf(result.getSwapCount()),
+                    String.valueOf(result.getComparisonCount())
+            });
+            writer.flush();
+            return baos.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("CSV 导出失败", e);
+        }
     }
 
     private byte[] exportHelloExcel(HelloResult result) {

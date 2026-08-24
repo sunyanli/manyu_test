@@ -3,8 +3,7 @@ import { Input, Button, Card, Select, message, Spin, Typography, Tag } from 'ant
 import { callHash } from '../services/api';
 import { HASH_ALGORITHMS } from '../utils/constants';
 
-const { TextArea } = Input;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 function HashTab() {
   const [input, setInput] = useState('');

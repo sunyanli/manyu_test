@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs, Typography, Space, Divider } from 'antd';
+import { Tabs, Typography, Divider } from 'antd';
 import { CodeOutlined, KeyOutlined, SortAscendingOutlined } from '@ant-design/icons';
 import HelloTab from '../components/HelloTab';
 import HashTab from '../components/HashTab';

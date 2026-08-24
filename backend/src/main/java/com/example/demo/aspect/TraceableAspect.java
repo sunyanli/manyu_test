@@ -2,7 +2,7 @@ package com.example.demo.aspect;
 
 import com.example.demo.annotation.Traceable;
 import com.example.demo.model.CallLog;
-import com.example.demo.repository.CallLogRepository;
+import com.example.demo.service.CallLogAsyncSaver;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 public class TraceableAspect {
 
     @Autowired
-    private CallLogRepository callLogRepository;
+    private CallLogAsyncSaver callLogAsyncSaver;
 
     @Around("@annotation(traceable)")
     public Object logCall(ProceedingJoinPoint joinPoint, Traceable traceable) throws Throwable {
@@ -65,6 +65,6 @@ public class TraceableAspect {
         log.setCallTime(LocalDateTime.now());
         log.setDurationMs(durationMs);
         log.setStatus(status);
-        callLogRepository.save(log);
+        callLogAsyncSaver.save(log);
     }
 }

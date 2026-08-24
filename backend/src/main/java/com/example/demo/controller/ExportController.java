@@ -1,5 +1,6 @@
 package com.example.demo.controller;
 
+import com.example.demo.annotation.Traceable;
 import com.example.demo.service.ExportService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -15,8 +16,13 @@ public class ExportController {
     private ExportService exportService;
 
     @GetMapping
+    @Traceable(apiName = "export")
     public ResponseEntity<byte[]> export(@RequestParam String type,
-                                         @RequestParam(defaultValue = "csv") String format) {
+                                         @RequestParam(defaultValue = "csv") String format,
+                                         @RequestParam(required = false) String name,
+                                         @RequestParam(required = false) String input,
+                                         @RequestParam(required = false) String algorithm,
+                                         @RequestParam(required = false) String array) {
         byte[] data;
         String filename;
         String contentType;
@@ -31,13 +37,13 @@ public class ExportController {
 
         switch (type) {
             case "hello":
-                data = exportService.exportHello(format);
+                data = exportService.exportHello(name, format);
                 break;
             case "hash":
-                data = exportService.exportHash(format);
+                data = exportService.exportHash(input, algorithm, format);
                 break;
             case "bubble":
-                data = exportService.exportBubble(format);
+                data = exportService.exportBubble(array, format);
                 break;
             default:
                 return ResponseEntity.badRequest().build();
