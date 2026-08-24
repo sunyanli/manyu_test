@@ -1,0 +1,24 @@
+package com.example.demo.controller;
+
+import com.example.demo.annotation.Traceable;
+import com.example.demo.dto.ApiResponse;
+import com.example.demo.dto.BubbleRequest;
+import com.example.demo.model.BubbleResult;
+import com.example.demo.service.BubbleService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api")
+public class BubbleController {
+
+    @Autowired
+    private BubbleService bubbleService;
+
+    @PostMapping("/bubble-sort")
+    @Traceable(apiName = "bubble-sort")
+    public ApiResponse<BubbleResult> bubbleSort(@RequestBody BubbleRequest request) {
+        BubbleResult result = bubbleService.sort(request.getArray());
+        return ApiResponse.success(result);
+    }
+}
