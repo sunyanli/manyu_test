@@ -10,8 +10,8 @@
 
 | 层面 | 技术栈 | 所在仓库 |
 |------|--------|---------|
-| 后端 | Python（Flask 或 FastAPI） | `manyu_test` |
-| 前端 | Vue 或 React | `manyu_test1` |
+| 后端 | Python（FastAPI + uvicorn） | `manyu_test` |
+| 前端 | Vue 3 + Vite | `manyu_test1` |
 
 ## 三、仓库分工与依赖关系
 
@@ -97,8 +97,12 @@ manyu_test (Python 后端)                    manyu_test1 (前端 Vue/React)
 
 | 决策项 | 结论 |
 |--------|------|
-| 后端技术栈 | Python（Flask 或 FastAPI） |
-| 前端技术栈 | Vue 或 React |
+| 后端技术栈 | Python（FastAPI + uvicorn） |
+| 前端技术栈 | Vue 3 + Vite |
+| 图表库 | ECharts |
+| 导出格式 | CSV |
+| 调用人身份 | 通过请求头 `X-Caller-Info` 传入 JSON（含 caller、person_type、person_level、person_department） |
+| 埋点数据存储 | SQLite（`tracking.db`） |
 | 仓库分工 | manyu_test = 后端, manyu_test1 = 前端 |
 | 冒泡排序 | 复用已有 `bubble_sort.py` 算法 |
 
@@ -222,13 +226,15 @@ manyu_test (Python 后端)                    manyu_test1 (前端 Vue/React)
 | Tab 内容区 | 单个 Tab 渲染崩溃不影响其他 Tab | 仅崩溃的 Tab 展示 "该页面加载异常" |
 | 图表组件 | 单个图表渲染崩溃不影响其他图表 | 仅崩溃的图表展示 "图表渲染失败" |
 
-## 十、待后续明确项
+## 十、技术选型确认记录
 
-> 以下问题将在后续执行阶段逐步澄清，当前阶段不影响需求澄清文档的完整性：
+> 以下技术选型已于 2026-08-24 经用户确认，按此推进实施：
 
-1. **Python 框架**：Flask 还是 FastAPI？（FastAPI 天然支持 OpenAPI 文档，推荐）
-2. **前端框架**：Vue 3 还是 React 18？
-3. **图表库**：ECharts / Chart.js / D3.js？
-4. **导出格式**：CSV / Excel / PDF？
-5. **调用人身份**：如何获取调用人信息？（硬编码模拟 / 简单登录 / 请求头传入）
-6. **数据存储**：埋点数据存文件 / SQLite / 其他？
+| 待明确项 | 最终确认 | 理由 |
+|---------|---------|------|
+| Python 框架 | **FastAPI** | 天然支持 OpenAPI 文档、异步支持好、开发效率高 |
+| 前端框架 | **Vue 3 + Vite** | 轻量、生态成熟、与 ECharts 集成便捷 |
+| 图表库 | **ECharts** | 图表类型丰富、Vue 3 生态支持好 |
+| 导出格式 | **CSV** | 通用性强、无需额外依赖，前端可直接解析 |
+| 调用人身份 | **请求头 `X-Caller-Info`** | 最简单模拟方式，无需登录系统，前端构造模拟数据传入 |
+| 埋点数据存储 | **SQLite（`tracking.db`）** | 零配置、嵌入式中型方案，满足单机场景 |
