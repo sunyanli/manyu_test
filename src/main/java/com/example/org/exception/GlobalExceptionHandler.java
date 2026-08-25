@@ -1,6 +1,8 @@
 package com.example.org.exception;
 
 import com.example.org.common.ApiResponse;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -30,6 +32,14 @@ public class GlobalExceptionHandler {
                 .reduce((a, b) -> a + "; " + b)
                 .orElse("Validation failed");
         return ApiResponse.error(400, message);
+    }
+
+    /**
+     * Handle database constraint violations (unique key, etc.) as client errors.
+     */
+    @ExceptionHandler({DataIntegrityViolationException.class, DuplicateKeyException.class})
+    public ApiResponse<Void> handleDataIntegrityViolation(Exception ex) {
+        return ApiResponse.error(400, "数据已存在/冲突");
     }
 
     /**

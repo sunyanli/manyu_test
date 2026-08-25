@@ -9,9 +9,9 @@ import org.apache.ibatis.annotations.Select;
 @Mapper
 public interface EmployeeRepository extends BaseMapper<Employee> {
 
-    @Select("SELECT COUNT(*) FROM employees WHERE employee_no = #{employeeNo}")
+    @Select("SELECT COUNT(*) FROM employees WHERE employee_no = #{employeeNo} AND status != 'RESIGNED'")
     int countByEmployeeNo(@Param("employeeNo") String employeeNo);
 
-    @Select("SELECT COUNT(*) FROM employees WHERE phone = #{phone}")
+    @Select("SELECT COUNT(*) FROM employees WHERE phone = #{phone} AND status != 'RESIGNED'")
     int countByPhone(@Param("phone") String phone);
 }

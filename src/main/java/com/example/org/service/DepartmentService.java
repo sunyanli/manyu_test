@@ -8,6 +8,7 @@ import com.example.org.model.dto.DepartmentStatusDTO;
 import com.example.org.model.dto.DepartmentTreeDTO;
 import com.example.org.model.dto.DepartmentUpdateDTO;
 import com.example.org.model.entity.Department;
+import com.example.org.model.enums.DepartmentStatus;
 import com.example.org.repository.DepartmentRepository;
 import com.example.org.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
@@ -119,6 +120,12 @@ public class DepartmentService {
         Department department = departmentRepository.selectById(id);
         if (department == null) {
             throw new BusinessException(404, "部门不存在");
+        }
+        // Validate status value is a valid enum
+        try {
+            DepartmentStatus.valueOf(dto.getStatus());
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException(400, "无效的状态值，仅支持 ACTIVE / DISABLED");
         }
         department.setStatus(dto.getStatus());
         departmentRepository.updateById(department);

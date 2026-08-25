@@ -13,6 +13,7 @@ import com.example.org.repository.DepartmentRepository;
 import com.example.org.repository.EmployeeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -44,6 +45,7 @@ public class EmployeeService {
     /**
      * Create a new employee.
      */
+    @Transactional
     public Employee create(EmployeeCreateDTO dto) {
         // Validate department exists and is ACTIVE
         Department department = departmentRepository.selectById(dto.getDeptId());
@@ -132,6 +134,11 @@ public class EmployeeService {
             employee.setName(dto.getName());
         }
         if (dto.getPhone() != null) {
+            if (!dto.getPhone().equals(employee.getPhone())) {
+                if (employeeRepository.countByPhone(dto.getPhone()) != 0) {
+                    throw new BusinessException(400, "手机号已被其他员工使用");
+                }
+            }
             employee.setPhone(dto.getPhone());
         }
         if (dto.getPosition() != null) {
