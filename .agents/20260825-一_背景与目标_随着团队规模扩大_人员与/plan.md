@@ -477,7 +477,55 @@ com.example.approval
 
 ---
 
-## 10. 下一步
+## 10. 验收标准 (Acceptance Criteria)
+
+### 10.1 需求逐项验收
+
+| 需求 | 验收项 | 验证方式 |
+|------|--------|----------|
+| 需求1-部门树 | `GET /api/departments/tree` 返回正确树形 JSON；`/{id}/children` 懒加载可用；`/{id}/move` 拖拽禁止循环引用 | 集成测试 + 手动 API 调用 |
+| 需求2-员工新增 | `GET /api/employees/check` 唯一性校验正确；`POST /api/employees` 并发插入被唯一索引拒绝 | 单元测试 + 并发测试 |
+| 需求3-人员调动 | `POST /api/employees/{id}/transfer` 更新 dept_id + 写入 transfer_records + 发布事件 | 集成测试 + 事件断言 |
+| 需求4-员工离职 | `PUT /api/employees/{id}/resign` 仅改 status，不物理删除；历史数据保留 | 集成测试 + 数据完整性检查 |
+
+### 10.2 跨仓契约验收
+
+| 契约方向 | 验收项 | 验证方式 |
+|----------|--------|----------|
+| manyu_test → manyu_test1 (REST) | 响应体格式 `{code, data, msg}` 一致；分页格式 `{total, page, pageSize, list}` 一致 | API 文档对比 |
+| manyu_test → manyu_test1 (Event) | `EmployeeTransferredEvent` / `EmployeeResignedEvent` 字段完整且 manyu_test1 预留消费者桩可反序列化 | 事件 schema 校验 |
+
+### 10.3 非功能验收
+
+- 部门树递归CTE在1000节点内响应 < 200ms
+- 唯一性校验接口响应 < 50ms
+- 调动/离职事务内完成，无部分成功状态
+
+---
+
+## 11. DIMA 问题闭环追溯
+
+以下将 DIMA 阶段标记的 P0/P1 问题与 plan 中的默认假设建立闭环：
+
+| DIMA 问题 | 优先级 | Plan 默认假设（§9） | 闭环状态 |
+|-----------|--------|---------------------|----------|
+| Q-D1 懒加载端点 | P0 | `/tree` 完整树 + `/{id}/children` 懒加载 | ✅ §4.1.1/4.1.2 |
+| Q-D4 根部门数量 | P0 | 允许多顶级部门（森林） | ✅ §9 |
+| Q-E3 必填字段 | P0 | name, employeeNo, deptId 必填 | ✅ §4.2.2 |
+| Q-E4 工号规则 | P0 | 手动输入，后端校验唯一性 | ✅ §9 |
+| Q-CC4 数据库 | P0 | MySQL 8.0 + 邻接表 | ✅ §2 |
+| Q-T1 级联审批 | P1 | 异步事件通知，manyu_test1 预留消费者 | ✅ §4.2.6, §7.2 |
+| Q-T2 调动记录字段 | P1 | from/to dept/position + reason + operator + time | ✅ §3.1 transfer_records |
+| Q-RS1 状态枚举 | P1 | ACTIVE / RESIGNED / SUSPENDED | ✅ §2 |
+| Q-RS4 复职 | P1 | 本期不支持 | ✅ §9 |
+| Q-CC1 认证 | P1 | JWT Bearer Token | ✅ §2 |
+| Q-CC2 权限粒度 | P1 | RBAC + SQL 层 dept_id 过滤 | ✅ §2, §5.1 |
+
+> 未闭环的 P2 问题（Q-D3 排序、Q-D5 停用展示、Q-E5 批量导入、Q-RS6 GDPR）已纳入后续迭代范围，不阻塞本期交付。
+
+---
+
+## 12. 下一步
 
 1. **确认待澄清问题**（第9节），定稿默认假设或修正
 2. **启动 Phase 1**：初始化 manyu_test Spring Boot 项目骨架
@@ -489,3 +537,4 @@ com.example.approval
 > 文档所有者：DTCoder
 > 关联任务：DEV-9d10e310-7901-11f1-8a9f-59ecae612580-c975ca68-86c4-4ca4-950f-53bed3ea6224
 > 前置文档：dima.md（需求澄清）
+> DIMA 闭环：30 个澄清问题中 P0/P1 共 11 个，已全部在本计划中以默认假设闭环
