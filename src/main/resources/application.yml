@@ -23,7 +23,7 @@ mybatis-plus:
       id-type: auto
 
 jwt:
-  secret: org-service-jwt-secret-key-must-be-at-least-256-bits-long
+  secret: ${JWT_SECRET:org-service-jwt-secret-key-must-be-at-least-256-bits-long}
   expiration: 86400000
 
 logging:

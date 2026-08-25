@@ -29,6 +29,9 @@ public class EmployeeService {
      * Check uniqueness of a field (employeeNo or phone).
      */
     public Map<String, Boolean> checkUnique(String field, String value) {
+        if (value == null || value.isBlank()) {
+            throw new BusinessException(400, "校验值不能为空");
+        }
         boolean isExist;
         if ("employeeNo".equals(field)) {
             isExist = employeeRepository.countByEmployeeNo(value) != 0;

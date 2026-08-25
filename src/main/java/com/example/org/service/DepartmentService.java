@@ -38,12 +38,21 @@ public class DepartmentService {
     /**
      * Get child departments by parent ID.
      */
-    public List<Department> getChildren(Long parentId) {
+    public List<DepartmentTreeDTO> getChildren(Long parentId) {
         LambdaQueryWrapper<Department> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Department::getParentId, parentId)
                 .eq(Department::getStatus, "ACTIVE")
                 .orderByAsc(Department::getSortOrder);
-        return departmentRepository.selectList(wrapper);
+        List<Department> departments = departmentRepository.selectList(wrapper);
+        return departments.stream().map(dept -> {
+            DepartmentTreeDTO dto = new DepartmentTreeDTO();
+            dto.setId(dept.getId());
+            dto.setName(dept.getName());
+            dto.setParentId(dept.getParentId());
+            dto.setSortOrder(dept.getSortOrder());
+            dto.setStatus(dept.getStatus());
+            return dto;
+        }).collect(Collectors.toList());
     }
 
     /**
@@ -132,17 +141,10 @@ public class DepartmentService {
     }
 
     /**
-     * Recursively collect all descendant department IDs.
+     * Recursively collect all descendant department IDs using a single recursive CTE query.
      */
     private List<Long> collectDescendantIds(Long id) {
-        List<Long> result = new ArrayList<>();
-        List<Department> children = departmentRepository.selectList(
-                new LambdaQueryWrapper<Department>().eq(Department::getParentId, id));
-        for (Department child : children) {
-            result.add(child.getId());
-            result.addAll(collectDescendantIds(child.getId()));
-        }
-        return result;
+        return departmentRepository.selectDescendantIds(id);
     }
 
     /**

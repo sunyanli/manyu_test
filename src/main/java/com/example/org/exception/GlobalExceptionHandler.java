@@ -1,6 +1,7 @@
 package com.example.org.exception;
 
 import com.example.org.common.ApiResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * Global exception handler that translates exceptions into consistent
  * {@link ApiResponse} bodies.
  */
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -39,6 +41,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler({DataIntegrityViolationException.class, DuplicateKeyException.class})
     public ApiResponse<Void> handleDataIntegrityViolation(Exception ex) {
+        log.warn("Data integrity violation", ex);
         return ApiResponse.error(400, "数据已存在/冲突");
     }
 
@@ -47,6 +50,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ApiResponse<Void> handleException(Exception ex) {
+        log.error("Unhandled exception", ex);
         return ApiResponse.error(500, "Internal Server Error");
     }
 }

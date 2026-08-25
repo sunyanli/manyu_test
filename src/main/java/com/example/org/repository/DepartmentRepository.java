@@ -3,6 +3,7 @@ package com.example.org.repository;
 import com.example.org.model.entity.Department;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
@@ -19,4 +20,11 @@ public interface DepartmentRepository extends BaseMapper<Department> {
             ") " +
             "SELECT * FROM dept_tree ORDER BY sort_order")
     List<Department> selectFullTree();
+
+    @Select("WITH RECURSIVE descendants AS (" +
+            "SELECT id FROM departments WHERE parent_id = #{id} " +
+            "UNION ALL " +
+            "SELECT d.id FROM departments d INNER JOIN descendants ds ON d.parent_id = ds.id" +
+            ") SELECT id FROM descendants")
+    List<Long> selectDescendantIds(@Param("id") Long id);
 }
