@@ -4,6 +4,7 @@
   "loop": "loop-1",
   "node": "需求澄清",
   "skill": "brainstorming",
+  "blocker_count": 0,
   "step_review": {
     "status": "completed",
     "summary": "需求澄清完成。8 项关键决策已由用户确认：FastAPI 后端 + Vue 3 前端，manyu_test/manyu_test1 分工明确，4 个接口契约已定稿（helloworld GET、hash POST、bubble_sort POST、export POST），前端交互为输入+执行+展示模式。已更新 dima.md 含完整接口契约。",
