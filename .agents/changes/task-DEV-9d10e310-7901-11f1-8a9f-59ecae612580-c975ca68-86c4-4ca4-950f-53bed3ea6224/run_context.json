@@ -41,10 +41,10 @@
     "loop": "loop-2",
     "skill": "code-review-skill",
     "status": "completed",
-    "blocker_count": 5,
-    "major_count": 3,
+    "blocker_count": 3,
+    "major_count": 4,
     "minor_count": 5,
-    "summary": "代码评审完成，发现 5 项 Blocker（phone唯一性校验缺失、DataIntegrityViolationException未处理、status校验缺失、MyBatisPlusInterceptor未配置、create事务边界缺失）、3 项 Major、5 项 Minor。",
+    "summary": "代码评审完成，发现 3 项 Blocker（phone唯一索引与应用层校验不一致、GlobalExceptionHandler缺异常日志、EmployeeController.checkUnique缺输入校验）、4 项 Major、5 项 Minor。跨仓契约：manyu_test1 OrgEventConsumer 方法签名与事件对象不对齐。",
     "artifacts": [
       ".agents/system.changes/cr_report.md"
     ],
