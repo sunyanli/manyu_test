@@ -44,15 +44,15 @@
     "loop": "loop-2",
     "skill": "code-review-skill",
     "status": "completed",
-    "blocker_count": 1,
-    "summary": "代码评审完成。发现1个Blocker（update_employee未阻止编辑离职员工），4个Medium（部门主管范围过滤缺失、Alembic迁移脚本缺失、check_unique未使用Pydantic Schema、requirements.txt重复依赖），3个Low（审批回调缺triggerTime、SQL LIKE通配符风险、测试覆盖缺口）。综合评级4/5。",
+    "blocker_count": 0,
+    "summary": "代码评审（复审）完成。上一轮Blocker B1已修复。当前0个Blocker，4个Medium（部门主管范围过滤缺失、Alembic迁移脚本缺失、list_employees关键词LIKE未转义、EmployeeCheckResult Schema未使用），3个Low（transfer_employee冗余查询、密码默认空值、测试覆盖缺口）。综合评级4/5。",
     "artifacts": [
       {
         "path": ".agents/system.changes/cr_report.md",
         "type": "代码评审报告",
-        "version": "v1.0",
-        "lines": 237,
-        "size_bytes": 11277
+        "version": "v2.0",
+        "lines": 263,
+        "size_bytes": 12760
       }
     ]
   }
