@@ -1,6 +1,7 @@
 """审批系统 HTTP 回调 — 异步通知，失败不阻塞主流程。"""
 
 import logging
+from datetime import datetime, timezone
 
 import httpx
 
@@ -29,6 +30,7 @@ async def notify_approval_system(
                     "oldDeptId": old_dept_id,
                     "newDeptId": new_dept_id,
                     "newPosition": new_position,
+                    "triggerTime": datetime.now(timezone.utc).isoformat(),
                 },
             )
             if resp.status_code >= 400:

@@ -174,6 +174,11 @@ async def get_department_by_id(db: AsyncSession, dept_id: int) -> Department | N
 
 # ── 内部辅助 ──
 
+def _escape_like(value: str) -> str:
+    """转义 SQL LIKE 通配符 % 和 _。"""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 async def _get_active_dept(db: AsyncSession, dept_id: int) -> Department | None:
     result = await db.execute(
         select(Department).where(Department.id == dept_id, Department.status == 1)
@@ -190,7 +195,7 @@ async def _calc_subtree_depth(db: AsyncSession, dept_id: int) -> int:
     # 查找所有以 dept.path 为前缀的子孙，取最大 level
     result = await db.execute(
         select(func.max(Department.level)).where(
-            Department.path.like(f"{dept.path}/%"), Department.status == 1
+            Department.path.like(_escape_like(dept.path) + "/%", escape="\\"), Department.status == 1
         )
     )
     max_level = result.scalar()
@@ -212,7 +217,7 @@ async def _cascade_update_children(
     # 查找所有 path 以 old_path/ 开头的子孙
     result = await db.execute(
         select(Department).where(
-            Department.path.like(f"{old_path}/%"), Department.status == 1
+            Department.path.like(_escape_like(old_path) + "/%", escape="\\"), Department.status == 1
         )
     )
     children = result.scalars().all()

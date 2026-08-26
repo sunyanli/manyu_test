@@ -7,6 +7,7 @@ from app.models.department import Department
 from app.models.employee import Employee
 from app.models.transfer_record import TransferRecord
 from app.utils.exceptions import ConflictException, NotFoundException, BadRequestException
+from app.services.department_service import _escape_like
 
 
 # ── 唯一性校验 ──
@@ -89,7 +90,7 @@ async def list_employees(
             return [], 0
         # 查询该部门及其所有子部门
         sub_dept_stmt = select(Department.id).where(
-            (Department.id == dept_id) | (Department.path.like(f"{dept.path}/%")),
+            (Department.id == dept_id) | (Department.path.like(_escape_like(dept.path) + "/%", escape="\\")),
             Department.status == 1,
         )
         sub_result = await db.execute(sub_dept_stmt)
@@ -136,6 +137,8 @@ async def update_employee(
     emp = await db.get(Employee, emp_id)
     if emp is None:
         raise NotFoundException("员工不存在")
+    if emp.status != 1:
+        raise BadRequestException("已离职员工不可编辑")
 
     if name is not None:
         emp.name = name

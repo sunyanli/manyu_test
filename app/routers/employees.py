@@ -23,12 +23,11 @@ router = APIRouter(prefix="/api/employees", tags=["employees"])
 
 @router.get("/check")
 async def check_unique(
-    field: str = Query(..., description="employeeNo | phone"),
-    value: str = Query(..., description="待校验值"),
+    params: EmployeeCheckRequest = Depends(),
     db: AsyncSession = Depends(get_db),
 ):
     """实时唯一性校验。"""
-    is_exist = await employee_service.check_unique(db, field, value)
+    is_exist = await employee_service.check_unique(db, params.field, params.value)
     return {"code": 200, "data": {"isExist": is_exist}, "msg": "ok"}
 
 
