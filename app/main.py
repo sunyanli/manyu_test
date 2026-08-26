@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.config import settings
 from app.database import engine
 from app.models.base import Base
 from app.routers import departments, employees
@@ -17,10 +18,10 @@ from fastapi.exceptions import RequestValidationError
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期：启动时创建表（开发环境），关闭时释放连接。"""
-    # 开发环境自动建表（生产请用 Alembic 迁移）
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """应用生命周期：开发环境自动建表，关闭时释放连接。"""
+    if settings.auto_create_tables:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
     yield
     await engine.dispose()
 

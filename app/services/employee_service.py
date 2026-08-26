@@ -89,7 +89,8 @@ async def list_employees(
             return [], 0
         # 查询该部门及其所有子部门
         sub_dept_stmt = select(Department.id).where(
-            (Department.id == dept_id) | (Department.path.like(f"{dept.path}/%"))
+            (Department.id == dept_id) | (Department.path.like(f"{dept.path}/%")),
+            Department.status == 1,
         )
         sub_result = await db.execute(sub_dept_stmt)
         dept_ids = [row[0] for row in sub_result.all()]

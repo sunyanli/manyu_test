@@ -117,7 +117,13 @@ async def transfer_employee(
 ):
     """人员调动（超管/HR）。"""
     require_admin_or_hr(user)
-    emp = await employee_service.transfer_employee(
+    # 先读取调动前的 dept_id（snapshot），因为 transfer_employee 会原地修改 emp
+    emp_before = await employee_service.get_employee(db, emp_id)
+    if emp_before is None:
+        return {"code": 404, "data": None, "msg": "员工不存在"}
+    old_dept_id = emp_before.dept_id
+
+    await employee_service.transfer_employee(
         db,
         emp_id=emp_id,
         new_dept_id=body.new_dept_id,
@@ -130,7 +136,7 @@ async def transfer_employee(
     asyncio.create_task(
         notify_approval_system(
             employee_id=emp_id,
-            old_dept_id=emp.dept_id,
+            old_dept_id=old_dept_id,
             new_dept_id=body.new_dept_id,
             new_position=body.new_position,
         )

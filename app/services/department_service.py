@@ -21,14 +21,24 @@ async def get_tree(
     result = await db.execute(stmt)
     depts = result.scalars().all()
 
+    # 批量查询子节点计数，避免 N+1
+    dept_ids = [d.id for d in depts]
+    has_children_map: dict[int, bool] = {}
+    if dept_ids:
+        child_counts_stmt = (
+            select(Department.parent_id, func.count(Department.id))
+            .where(
+                Department.parent_id.in_(dept_ids),
+                Department.status == 1,
+            )
+            .group_by(Department.parent_id)
+        )
+        child_counts_result = await db.execute(child_counts_stmt)
+        has_children_map = {row[0]: row[1] > 0 for row in child_counts_result.all()}
+
     nodes = []
     for d in depts:
-        # 判断是否有子节点
-        count_stmt = select(func.count(Department.id)).where(
-            Department.parent_id == d.id, Department.status == 1
-        )
-        count_result = await db.execute(count_stmt)
-        has_children = count_result.scalar() > 0
+        has_children = has_children_map.get(d.id, False)
 
         nodes.append(
             {
@@ -60,20 +70,17 @@ async def create_department(
             raise BadRequestException(f"部门层级超过最大限制({settings.max_dept_level}层)")
         parent_path = parent.path
 
-    path = f"{parent_path}/{parent_id}" if parent_id else ""
-
     dept = Department(
         name=name,
         parent_id=parent_id,
         level=level,
-        path=path,
+        path="",  # 先占位，flush 获取 id 后再设置正确路径
         sort_order=sort_order,
     )
     db.add(dept)
     await db.flush()
-    # 如果 path 为空，补上自身 id
-    if not dept.path:
-        dept.path = f"/{dept.id}"
+    # 使用自身 id 构建物化路径
+    dept.path = f"{parent_path}/{dept.id}" if parent_id else f"/{dept.id}"
     await db.flush()
     return dept
 

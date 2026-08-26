@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # 部门树最大深度
     max_dept_level: int = 10
 
+    # 开发环境自动建表（生产环境应设为 false，使用 Alembic 迁移）
+    auto_create_tables: bool = True
+
     @property
     def database_url(self) -> str:
         return (
