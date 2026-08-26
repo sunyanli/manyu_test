@@ -28,7 +28,11 @@ async def check_unique(
 ):
     """实时唯一性校验。"""
     is_exist = await employee_service.check_unique(db, params.field, params.value)
-    return {"code": 200, "data": {"isExist": is_exist}, "msg": "ok"}
+    return {
+        "code": 200,
+        "data": EmployeeCheckResult(isExist=is_exist).model_dump(),
+        "msg": "ok",
+    }
 
 
 @router.post("")

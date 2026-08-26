@@ -60,7 +60,7 @@ class EmployeeResign(BaseModel):
 # ── 响应体 ──
 
 class EmployeeCheckResult(BaseModel):
-    is_exist: bool = False
+    isExist: bool = False
 
 
 class EmployeeInfo(BaseModel):

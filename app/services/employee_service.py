@@ -101,9 +101,10 @@ async def list_employees(
         stmt = stmt.where(Employee.status == status)
 
     if keyword:
+        escaped = _escape_like(keyword)
         stmt = stmt.where(
-            (Employee.name.like(f"%{keyword}%"))
-            | (Employee.employee_no.like(f"%{keyword}%"))
+            (Employee.name.like(f"%{escaped}%"))
+            | (Employee.employee_no.like(f"%{escaped}%"))
         )
 
     # 计数
