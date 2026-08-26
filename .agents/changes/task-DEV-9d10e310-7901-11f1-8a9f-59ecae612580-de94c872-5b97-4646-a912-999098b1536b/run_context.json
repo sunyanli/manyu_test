@@ -38,5 +38,22 @@
     },
     "generated_at": "2026-08-25",
     "verified_at": "2026-08-25"
+  },
+  "step_code_review": {
+    "phase": "代码评审",
+    "loop": "loop-2",
+    "skill": "code-review-skill",
+    "status": "completed",
+    "blocker_count": 1,
+    "summary": "代码评审完成。发现1个Blocker（update_employee未阻止编辑离职员工），4个Medium（部门主管范围过滤缺失、Alembic迁移脚本缺失、check_unique未使用Pydantic Schema、requirements.txt重复依赖），3个Low（审批回调缺triggerTime、SQL LIKE通配符风险、测试覆盖缺口）。综合评级4/5。",
+    "artifacts": [
+      {
+        "path": ".agents/system.changes/cr_report.md",
+        "type": "代码评审报告",
+        "version": "v1.0",
+        "lines": 237,
+        "size_bytes": 11277
+      }
+    ]
   }
 }
