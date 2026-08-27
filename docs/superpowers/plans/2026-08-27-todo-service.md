@@ -1,41 +1,41 @@
-# 待办事项服务实现计划
+# Todo Service Implementation Plan
 
-> **For agentic workers:** 本计划完成后，使用 `superpowers:executing-plans` 或 `superpowers:subagent-driven-development` 按任务逐步执行。步骤使用 `- [ ]` 复选框语法跟踪进度。
+> **For agentic workers:** After this plan is complete, use `superpowers:executing-plans` or `superpowers:subagent-driven-development` to implement it task by task. Steps use `- [ ]` checkbox syntax for tracking.
 
-**Goal:** 实现一个仅支持新增待办事项的 FastAPI + SQLite Web 服务。
+**Goal:** Build a minimal FastAPI + SQLite web service that only supports creating todo items.
 
-**Architecture:** 采用 FastAPI 提供 `POST /todos` 接口；使用 SQLAlchemy ORM 定义 `TodoItem` 模型并写入 SQLite 文件；Pydantic 负责请求/响应校验；uvicorn 运行应用。
+**Architecture:** FastAPI exposes `POST /todos`; SQLAlchemy ORM defines the `TodoItem` model and writes to a local SQLite file; Pydantic validates request/response bodies; uvicorn runs the application and a `lifespan` handler creates tables on startup.
 
-**Tech Stack:** FastAPI、SQLite、SQLAlchemy 2.x、Pydantic 2.x、uvicorn、pytest、httpx
-
----
-
-## 全局约束
-
-- 最小闭环：仅支持创建待办事项，不实现查询/编辑/删除。
-- 不引入认证、权限、多用户。
-- 使用 SQLite 文件数据库，便于本地运行。
-- 测试使用内存/独立 SQLite 文件，避免污染开发数据库。
-- 代码风格与文件职责清晰，避免单文件臃肿。
+**Tech Stack:** FastAPI, SQLite, SQLAlchemy 2.x, Pydantic 2.x, uvicorn, pytest, httpx
 
 ---
 
-## 文件结构
+## Global Constraints
+
+- Minimum viable scope: only create todos; no read/update/delete/list endpoints.
+- No authentication, authorization, or multi-user support.
+- Use a local SQLite file database so the service runs without external dependencies.
+- Tests must use an isolated SQLite database and not pollute the development `todos.db`.
+- Keep files focused and responsibilities clear.
+
+---
+
+## File Structure
 
 ```
 todo_service/
-  __init__.py    # 包入口（空或含版本）
-  database.py    # 引擎、会话、依赖注入
-  models.py      # SQLAlchemy TodoItem 模型
-  schemas.py     # Pydantic 请求/响应模型
+  __init__.py    # package entry (version only)
+  database.py    # engine, session factory, and get_db dependency
+  models.py      # SQLAlchemy TodoItem model
+  schemas.py     # Pydantic request/response models
 tests/
-  test_main.py   # 创建接口测试
-pyproject.toml   # 项目依赖与元数据
+  test_main.py   # POST /todos endpoint tests
+pyproject.toml   # project metadata and dependencies
 ```
 
 ---
 
-## Task 1: 项目依赖与数据库基础设施
+## Task 1: Project Dependencies and Database Infrastructure
 
 **Files:**
 - Create: `pyproject.toml`
@@ -44,10 +44,10 @@ pyproject.toml   # 项目依赖与元数据
 - Create: `todo_service/models.py`
 
 **Interfaces:**
-- Produces: `database.engine`、`database.SessionLocal`、`database.Base`、`database.get_db()`
+- Produces: `database.engine`, `database.SessionLocal`, `database.Base`, `database.get_db()`
 - Produces: `models.TodoItem`
 
-- [ ] **Step 1: 创建 pyproject.toml**
+- [ ] **Step 1: Create `pyproject.toml`**
 
 ```toml
 [project]
@@ -69,19 +69,21 @@ dev = [
 ]
 ```
 
-- [ ] **Step 2: 安装依赖**
+- [ ] **Step 2: Install dependencies**
 
 ```bash
 pip install -e ".[dev]"
 ```
 
-- [ ] **Step 3: 创建 `todo_service/__init__.py`**
+Expected: `fastapi`, `uvicorn`, `sqlalchemy`, `pydantic`, `pytest`, and `httpx` are installed.
+
+- [ ] **Step 3: Create `todo_service/__init__.py`**
 
 ```python
 __version__ = "0.1.0"
 ```
 
-- [ ] **Step 4: 创建 `todo_service/database.py`**
+- [ ] **Step 4: Create `todo_service/database.py`**
 
 ```python
 from sqlalchemy import create_engine
@@ -105,10 +107,10 @@ def get_db():
         db.close()
 ```
 
-- [ ] **Step 5: 创建 `todo_service/models.py`**
+- [ ] **Step 5: Create `todo_service/models.py`**
 
 ```python
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Text, DateTime
 from .database import Base
 
@@ -119,36 +121,36 @@ class TodoItem(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 ```
 
-- [ ] **Step 6: 验证表可创建**
+- [ ] **Step 6: Verify tables can be created**
 
 ```bash
 python -c "from todo_service.database import engine; from todo_service.models import Base; Base.metadata.create_all(bind=engine); print('tables created')"
 ```
 
-Expected: 输出 `tables created`，目录下生成 `todos.db`。
+Expected: prints `tables created` and a `todos.db` SQLite file appears in the project root.
 
 ---
 
-## Task 2: API 接口与数据校验
+## Task 2: API Endpoint and Request/Response Validation
 
 **Files:**
 - Create: `todo_service/schemas.py`
 - Create: `todo_service/main.py`
 
 **Interfaces:**
-- Consumes: `database.engine`、`database.get_db`、`models.TodoItem`
-- Produces: `schemas.TodoCreate`、`schemas.TodoRead`
-- Produces: `main.app`、`main.create_todo`
+- Consumes: `database.engine`, `database.get_db`, `models.TodoItem`
+- Produces: `schemas.TodoCreate`, `schemas.TodoRead`
+- Produces: `main.app`, `main.create_todo`
 
-- [ ] **Step 1: 创建 `todo_service/schemas.py`**
+- [ ] **Step 1: Create `todo_service/schemas.py`**
 
 ```python
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class TodoCreate(BaseModel):
@@ -160,24 +162,26 @@ class TodoRead(TodoCreate):
     id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 ```
 
-- [ ] **Step 2: 创建 `todo_service/main.py`**
+- [ ] **Step 2: Create `todo_service/main.py`**
 
 ```python
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from . import models, schemas
 from .database import engine, get_db
 
-app = FastAPI(title="Todo Service")
 
-
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     models.Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(title="Todo Service", lifespan=lifespan)
 
 
 @app.post("/todos", response_model=schemas.TodoRead, status_code=201)
@@ -193,13 +197,13 @@ def create_todo(todo: schemas.TodoCreate, db: Session = Depends(get_db)):
     return db_todo
 ```
 
-- [ ] **Step 3: 启动服务并手动验证接口**
+- [ ] **Step 3: Start the service and manually verify the endpoint**
 
 ```bash
 uvicorn todo_service.main:app --reload
 ```
 
-在另一个终端执行：
+In another terminal:
 
 ```bash
 curl -X POST http://localhost:8000/todos \
@@ -207,20 +211,20 @@ curl -X POST http://localhost:8000/todos \
   -d '{"name":"整理周报","description":"汇总本周进展"}'
 ```
 
-Expected: HTTP 201，返回包含 `id`、`name`、`description`、`created_at` 的 JSON。
+Expected: HTTP 201 with a JSON body containing `id`, `name`, `description`, and `created_at`.
 
 ---
 
-## Task 3: 接口测试
+## Task 3: Endpoint Tests
 
 **Files:**
 - Create: `tests/test_main.py`
 
 **Interfaces:**
-- Consumes: `main.app`、`database.Base`、`database.get_db`
-- Produces: `test_create_todo`、`test_create_todo_missing_name`
+- Consumes: `main.app`, `database.Base`, `database.get_db`
+- Produces: `test_create_todo`, `test_create_todo_without_description`, `test_create_todo_missing_name`
 
-- [ ] **Step 1: 创建 `tests/test_main.py`**
+- [ ] **Step 1: Create `tests/test_main.py`**
 
 ```python
 import pytest
@@ -284,20 +288,21 @@ def test_create_todo_missing_name(client):
     assert response.status_code == 422
 ```
 
-- [ ] **Step 2: 运行测试**
+- [ ] **Step 2: Run tests**
 
 ```bash
 pytest tests/test_main.py -v
 ```
 
-Expected: 3 个测试全部通过。
+Expected: all 3 tests pass.
 
 ---
 
-## 自检清单
+## Self-Review Checklist
 
-- [ ] `POST /todos` 能正常创建记录并返回 201。
-- [ ] 缺少 `name` 时返回 422。
-- [ ] `description` 可选，为空时返回正常。
-- [ ] 测试通过，不污染 `todos.db`。
-- [ ] 无 TODO、TBD、占位符。
+- [ ] `POST /todos` creates a record and returns 201 with `id`, `name`, `description`, and `created_at`.
+- [ ] Missing or invalid `name` returns 422.
+- [ ] `description` is optional and accepted as `null`.
+- [ ] Tests run against an isolated `test_todos.db` and do not touch `todos.db`.
+- [ ] Tables are created automatically when the application starts.
+- [ ] No TODO, TBD, or placeholder text remains.
