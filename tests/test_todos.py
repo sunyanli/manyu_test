@@ -1,9 +1,29 @@
 from fastapi.testclient import TestClient
+import os
+import pytest
 import sqlite3
+import tempfile
 
-from app import DB_PATH, app
 
-client = TestClient(app)
+# app.init_db() runs during module import and uses a relative DB_PATH. Import it
+# from a temporary working directory so collection cannot initialize tracking.db.
+with tempfile.TemporaryDirectory() as import_dir:
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(import_dir)
+        import app
+    finally:
+        os.chdir(original_cwd)
+
+client = TestClient(app.app)
+
+
+@pytest.fixture(autouse=True)
+def temp_db(tmp_path, monkeypatch):
+    """Run each test against an isolated SQLite database."""
+    db_path = tmp_path / "todos_test.db"
+    monkeypatch.setattr(app, "DB_PATH", str(db_path))
+    app.init_db()
 
 
 def test_create_todo_success():
@@ -19,7 +39,7 @@ def test_create_todo_success():
     assert "id" in data["data"]
     assert "created_at" in data["data"]
 
-    with sqlite3.connect(DB_PATH) as conn:
+    with sqlite3.connect(app.DB_PATH) as conn:
         row = conn.execute(
             "SELECT id, name, description, created_at FROM todos WHERE id = ?",
             (data["data"]["id"],),

@@ -117,3 +117,49 @@ empty body:     422 {"success":false,"error_code":"ERR_TODO_004","message":"待�
 - `app.py` — 新增 `RequestValidationError` 异常处理器（+1 import，+20 行）。
 - `tests/test_todos.py` — 新增 4 个测试，并将成功测试扩展为校验数据库落库（+58 行）。
 - `.superpowers/sdd/task-1-report.md` — 追加本修复报告。
+
+
+---
+
+# 测试数据库隔离修复报告（Important）
+
+## What you changed
+
+- 修改 `tests/test_todos.py`，使测试模块在临时工作目录中导入 `app`。这避免了 `app.py` 模块导入时执行的 `init_db()` 使用相对路径创建或迁移仓库根目录的 `tracking.db`。
+- 新增自动使用的 `temp_db` pytest fixture：每个测试都会用 `tmp_path / "todos_test.db"` 覆盖 `app.DB_PATH`，然后调用 `app.init_db()` 创建所需表。`monkeypatch` 会在测试结束后自动恢复路径。
+- 成功创建测试的 SQLite 直接查询改为使用运行时的 `app.DB_PATH`，确保断言检查临时数据库而非导入时绑定的旧路径。
+
+## Test command and output
+
+```text
+$ PYTHONDONTWRITEBYTECODE=1 /tmp/todos-test-venv/bin/python -m pytest -p no:cacheprovider tests/test_todos.py -v
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-7.4.4, pluggy-1.6.0
+collecting ... collected 8 items
+
+tests/test_todos.py::test_create_todo_success PASSED
+tests/test_todos.py::test_create_todo_without_description PASSED
+tests/test_todos.py::test_create_todo_name_boundary_lengths PASSED
+tests/test_todos.py::test_create_todo_description_boundary_lengths PASSED
+tests/test_todos.py::test_create_todo_missing_name_uses_unified_validation_error PASSED
+tests/test_todos.py::test_create_todo_name_empty PASSED
+tests/test_todos.py::test_create_todo_name_too_long PASSED
+tests/test_todos.py::test_create_todo_description_too_long PASSED
+
+============================== 8 passed in 0.39s ===============================
+```
+
+## Verification that `tracking.db` is unchanged
+
+After the test command, `git status --short` reported only `M tests/test_todos.py`; it did not report `tracking.db`. The explicit verification printed `TRACKING_DB_UNCHANGED`.
+
+## Files changed
+
+- `tests/test_todos.py` — isolates module-import initialization and per-test SQLite storage under pytest temporary directories.
+- `.superpowers/sdd/task-1-report.md` — appended this fix report.
+
+## Self-review
+
+- The fixture is autouse, so every current and future test in this module receives a fresh temporary database.
+- The import-time temporary working directory is required because `app.py` invokes `init_db()` during import, before a fixture can patch `app.DB_PATH`.
+- No production files or dependency definitions were changed.
