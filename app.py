@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import FastAPI, Query, Request
-from fastapi.exceptions import HTTPException
+from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
@@ -365,6 +365,26 @@ async def http_exception_handler(request, exc):
             "message": str(exc.detail),
             "detail": None
         }
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Return validation failures using the service's unified error shape."""
+    if request.url.path == "/api/todos":
+        error_code = "ERR_TODO_004"
+        message = "待办请求数据无效，请检查名称和描述"
+    else:
+        error_code = "ERR_SYS_422"
+        message = "请求数据无效，请检查后重试"
+    return JSONResponse(
+        status_code=422,
+        content={
+            "success": False,
+            "error_code": error_code,
+            "message": message,
+            "detail": exc.errors(),
+        },
     )
 
 
