@@ -2,8 +2,14 @@ from fastapi.testclient import TestClient
 import os
 import pytest
 import sqlite3
+import sys
 import tempfile
+from pathlib import Path
 
+
+# Make the repo root importable so `import app` resolves to ./app.py even after
+# we switch to a temporary working directory during import.
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # app.init_db() runs during module import and uses a relative DB_PATH. Import it
 # from a temporary working directory so collection cannot initialize tracking.db.
