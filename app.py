@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import FastAPI, Query, Request
-from fastapi.exceptions import HTTPException
+from fastapi.exceptions import HTTPException, RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
@@ -55,6 +55,14 @@ def init_db():
             timestamp TEXT
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS todos (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            created_at TEXT
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -74,6 +82,11 @@ class TrackEventRequest(BaseModel):
     person_type: str = "unknown"
     person_level: str = "unknown"
     person_department: str = "unknown"
+
+
+class CreateTodoRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
 
 
 # ==================== 辅助函数 ====================
@@ -197,6 +210,61 @@ async def track_event(request: Request, event: TrackEventRequest):
         })
 
 
+# ==================== 待办接口 ====================
+
+
+@app.post("/api/todos", status_code=201)
+async def create_todo(request: Request, body: CreateTodoRequest):
+    if not body.name or len(body.name) > 100:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "error_code": "ERR_TODO_001",
+                "message": "待办名称不能为空或超过 100 字符",
+                "detail": None,
+            },
+        )
+    if body.description is not None and len(body.description) > 500:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "success": False,
+                "error_code": "ERR_TODO_002",
+                "message": "待办描述不能超过 500 字符",
+                "detail": None,
+            },
+        )
+    try:
+        todo_id = str(uuid.uuid4())
+        ts = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute(
+                "INSERT INTO todos (id, name, description, created_at) VALUES (?, ?, ?, ?)",
+                (todo_id, body.name, body.description, ts),
+            )
+            conn.commit()
+        return {
+            "success": True,
+            "data": {
+                "id": todo_id,
+                "name": body.name,
+                "description": body.description,
+                "created_at": ts,
+            },
+        }
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "success": False,
+                "error_code": "ERR_TODO_003",
+                "message": "待办创建失败，请稍后重试",
+                "detail": None,
+            },
+        )
+
+
 # ==================== 统计接口 ====================
 
 
@@ -297,6 +365,26 @@ async def http_exception_handler(request, exc):
             "message": str(exc.detail),
             "detail": None
         }
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Return validation failures using the service's unified error shape."""
+    if request.url.path == "/api/todos":
+        error_code = "ERR_TODO_004"
+        message = "待办请求数据无效，请检查名称和描述"
+    else:
+        error_code = "ERR_SYS_422"
+        message = "请求数据无效，请检查后重试"
+    return JSONResponse(
+        status_code=422,
+        content={
+            "success": False,
+            "error_code": error_code,
+            "message": message,
+            "detail": exc.errors(),
+        },
     )
 
 

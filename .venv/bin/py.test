@@ -1,0 +1,10 @@
+#!/bin/sh
+'''exec' /root/.agentix/agentic-dev/runs/DEV-7eb0cb3f-84c9-11f1-9849-d5c90ba1aaae-eda7d846-7301-4e18-bd3f-f747274e5a4a/worktree/.venv/bin/python3 "$0" "$@"
+' '''
+# -*- coding: utf-8 -*-
+import re
+import sys
+from pytest import console_main
+if __name__ == '__main__':
+    sys.argv[0] = re.sub(r'(-script\.pyw|\.exe)?$', '', sys.argv[0])
+    sys.exit(console_main())
