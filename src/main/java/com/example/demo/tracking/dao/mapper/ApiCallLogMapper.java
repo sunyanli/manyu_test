@@ -30,12 +30,24 @@ public interface ApiCallLogMapper extends BaseMapper<ApiCallLog> {
             + "FROM api_call_log "
             + "WHERE gmt_create BETWEEN #{startTime} AND #{endTime} "
             + "<if test='apiName != null'>AND api_name = #{apiName}</if> "
+            + "<if test='dimension != null and dimensionValue != null'>"
+            + "AND "
+            + "<choose>"
+            + "<when test='dimension == \"user_type\"'>user_type</when>"
+            + "<when test='dimension == \"user_level\"'>user_level</when>"
+            + "<when test='dimension == \"user_department\"'>user_department</when>"
+            + "<otherwise>user_type</otherwise>"
+            + "</choose>"
+            + " = #{dimensionValue} "
+            + "</if>"
             + "GROUP BY DATE_FORMAT(gmt_create, '%Y-%m-%d') "
             + "ORDER BY time ASC"
             + "</script>")
     List<Map<String, Object>> callStatsByDay(@Param("apiName") String apiName,
                                              @Param("startTime") String startTime,
-                                             @Param("endTime") String endTime);
+                                             @Param("endTime") String endTime,
+                                             @Param("dimension") String dimension,
+                                             @Param("dimensionValue") String dimensionValue);
 
     /**
      * 按维度聚合统计
@@ -45,11 +57,26 @@ public interface ApiCallLogMapper extends BaseMapper<ApiCallLog> {
      * @param endTime   结束时间
      * @return 维度统计结果
      */
-    @Select("SELECT ${dimension} AS label, COUNT(*) AS count "
+    @Select("<script>"
+            + "SELECT "
+            + "<choose>"
+            + "<when test='dimension == \"user_type\"'>user_type</when>"
+            + "<when test='dimension == \"user_level\"'>user_level</when>"
+            + "<when test='dimension == \"user_department\"'>user_department</when>"
+            + "<otherwise>user_type</otherwise>"
+            + "</choose>"
+            + " AS label, COUNT(*) AS count "
             + "FROM api_call_log "
             + "WHERE gmt_create BETWEEN #{startTime} AND #{endTime} "
-            + "GROUP BY ${dimension} "
-            + "ORDER BY count DESC")
+            + "GROUP BY "
+            + "<choose>"
+            + "<when test='dimension == \"user_type\"'>user_type</when>"
+            + "<when test='dimension == \"user_level\"'>user_level</when>"
+            + "<when test='dimension == \"user_department\"'>user_department</when>"
+            + "<otherwise>user_type</otherwise>"
+            + "</choose>"
+            + " ORDER BY count DESC"
+            + "</script>")
     List<Map<String, Object>> dimensionStats(@Param("dimension") String dimension,
                                              @Param("startTime") String startTime,
                                              @Param("endTime") String endTime);

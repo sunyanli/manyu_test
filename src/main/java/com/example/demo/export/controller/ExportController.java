@@ -1,10 +1,13 @@
 package com.example.demo.export.controller;
 
+import com.example.demo.common.exception.BusinessException;
+import com.example.demo.common.model.ApiResponse;
 import com.example.demo.export.model.request.ExportRequest;
 import com.example.demo.export.service.ExportService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -37,17 +40,24 @@ public class ExportController {
      * 导出数据为 Excel
      */
     @PostMapping("/data")
-    public ResponseEntity<byte[]> exportData(@Valid @RequestBody ExportRequest request) {
-        byte[] data = exportService.exportData(request);
+    public ResponseEntity<?> exportData(@Valid @RequestBody ExportRequest request) {
+        try {
+            byte[] data = exportService.exportData(request);
 
-        String fileName = URLEncoder.encode(request.getExportType() + "_export.xlsx",
-                StandardCharsets.UTF_8.toString());
+            String fileName = URLEncoder.encode(request.getExportType() + "_export.xlsx",
+                    StandardCharsets.UTF_8.toString());
 
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename*=UTF-8''" + fileName)
-                .contentType(MediaType.parseMediaType(
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                .body(data);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename*=UTF-8''" + fileName)
+                    .contentType(MediaType.parseMediaType(
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(data);
+        } catch (BusinessException e) {
+            logger.warn("导出失败: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(ApiResponse.error(e.getErrorCode(), e.getMessage()));
+        }
     }
 }
