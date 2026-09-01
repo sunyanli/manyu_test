@@ -9,20 +9,20 @@ import hash_algo._interface
 
 
 class TestHashAlgoDoctest(unittest.TestCase):
-    def test_doctests(self):
+    def test_doctests(self) -> None:
         """运行模块的 doctest"""
         results = doctest.testmod(hash_algo.sha256_impl)
         self.assertEqual(results.failed, 0, f"doctest 失败: {results.failed}")
 
 
 class TestSHA256Hasher(unittest.TestCase):
-    def setUp(self):
+    def setUp(self) -> None:
         self.hasher = hash_algo.sha256_impl.SHA256Hasher()
 
-    def test_algorithm_name(self):
+    def test_algorithm_name(self) -> None:
         self.assertEqual(self.hasher.algorithm_name, "sha256")
 
-    def test_hash_known_value(self):
+    def test_hash_known_value(self) -> None:
         """验证已知的 SHA-256 哈希值"""
         result = self.hasher.hash(b"hello")
         self.assertEqual(
@@ -30,20 +30,20 @@ class TestSHA256Hasher(unittest.TestCase):
             "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
         )
 
-    def test_hash_empty_bytes(self):
+    def test_hash_empty_bytes(self) -> None:
         result = self.hasher.hash(b"")
         self.assertEqual(
             result,
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         )
 
-    def test_hash_unicode(self):
+    def test_hash_unicode(self) -> None:
         result = self.hasher.hash("你好".encode("utf-8"))
         # 验证结果为 64 位十六进制字符串（SHA-256 长度）
         self.assertEqual(len(result), 64)
         self.assertTrue(all(c in "0123456789abcdef" for c in result))
 
-    def test_hash_file(self):
+    def test_hash_file(self) -> None:
         with tempfile.NamedTemporaryFile(mode="wb", delete=False) as f:
             f.write(b"hello")
             f.flush()
@@ -59,7 +59,7 @@ class TestSHA256Hasher(unittest.TestCase):
             import os
             os.unlink(filepath)
 
-    def test_hash_file_large_chunk(self):
+    def test_hash_file_large_chunk(self) -> None:
         """测试大块读取是否正常工作"""
         content = b"a" * 20000  # 大于默认 chunk_size
         with tempfile.NamedTemporaryFile(mode="wb", delete=False) as f:
@@ -76,7 +76,7 @@ class TestSHA256Hasher(unittest.TestCase):
             import os
             os.unlink(filepath)
 
-    def test_protocol_compatibility(self):
+    def test_protocol_compatibility(self) -> None:
         """验证 SHA256Hasher 符合 HashAlgorithmInterface"""
         hasher: hash_algo._interface.HashAlgorithmInterface = self.hasher
         self.assertIsNotNone(hasher)
