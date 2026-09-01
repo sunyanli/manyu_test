@@ -40,14 +40,9 @@ public class AlgorithmController {
      */
     @GetMapping("/helloworld")
     public ApiResponse<?> helloWorld(HttpServletRequest httpRequest) {
-        try {
-            ApiResponse<?> result = ApiResponse.success(algorithmService.helloWorld());
-            trackingService.recordCall("helloworld", getUserId(httpRequest));
-            return result;
-        } catch (Exception e) {
-            logger.error("helloworld 接口异常", e);
-            throw e;
-        }
+        ApiResponse<?> result = ApiResponse.success(algorithmService.helloWorld());
+        trackingService.recordCall("helloworld", getUserId(httpRequest));
+        return result;
     }
 
     /**
@@ -55,14 +50,9 @@ public class AlgorithmController {
      */
     @PostMapping("/hash")
     public ApiResponse<?> hash(@Valid @RequestBody HashRequest request, HttpServletRequest httpRequest) {
-        try {
-            ApiResponse<?> result = ApiResponse.success(algorithmService.computeHash(request));
-            trackingService.recordCall("hash", getUserId(httpRequest));
-            return result;
-        } catch (Exception e) {
-            logger.error("hash 接口异常", e);
-            throw e;
-        }
+        ApiResponse<?> result = ApiResponse.success(algorithmService.computeHash(request));
+        trackingService.recordCall("hash", getUserId(httpRequest));
+        return result;
     }
 
     /**
@@ -70,14 +60,9 @@ public class AlgorithmController {
      */
     @PostMapping("/bubble-sort")
     public ApiResponse<?> bubbleSort(@Valid @RequestBody BubbleSortRequest request, HttpServletRequest httpRequest) {
-        try {
-            ApiResponse<?> result = ApiResponse.success(algorithmService.bubbleSort(request));
-            trackingService.recordCall("bubble-sort", getUserId(httpRequest));
-            return result;
-        } catch (Exception e) {
-            logger.error("bubble-sort 接口异常", e);
-            throw e;
-        }
+        ApiResponse<?> result = ApiResponse.success(algorithmService.bubbleSort(request));
+        trackingService.recordCall("bubble-sort", getUserId(httpRequest));
+        return result;
     }
 
     /**

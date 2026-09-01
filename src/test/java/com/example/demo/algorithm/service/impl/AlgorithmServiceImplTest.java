@@ -83,6 +83,14 @@ class AlgorithmServiceImplTest {
     }
 
     @Test
+    @DisplayName("哈希计算：request 为 null 应抛出异常")
+    void shouldThrowException_whenRequestNull() {
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> algorithmService.computeHash(null));
+        assertEquals("ALG_002", exception.getErrorCode());
+    }
+
+    @Test
     @DisplayName("哈希计算：相同输入应产生相同哈希值")
     void shouldProduceSameHash_whenSameInput() {
         HashRequest request1 = new HashRequest();

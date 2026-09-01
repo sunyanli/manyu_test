@@ -4,6 +4,8 @@ import com.example.demo.common.constant.ErrorCodeEnum;
 import com.example.demo.common.exception.BusinessException;
 import com.example.demo.export.model.request.ExportRequest;
 import com.example.demo.export.service.ExportService;
+import com.example.demo.tracking.dao.mapper.ApiCallLogMapper;
+import com.example.demo.tracking.model.entity.ApiCallLog;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -14,8 +16,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -31,11 +35,17 @@ public class ExportServiceImpl implements ExportService {
     private static final Set<String> VALID_EXPORT_TYPES = new HashSet<String>(
             Arrays.asList("helloworld", "hash", "bubble_sort"));
 
+    private final ApiCallLogMapper apiCallLogMapper;
+
     @Value("${export.enabled:true}")
     private boolean exportEnabled;
 
     @Value("${export.max-records:10000}")
     private int maxRecords;
+
+    public ExportServiceImpl(ApiCallLogMapper apiCallLogMapper) {
+        this.apiCallLogMapper = apiCallLogMapper;
+    }
 
     @Override
     public byte[] exportData(ExportRequest request) {
@@ -51,6 +61,9 @@ public class ExportServiceImpl implements ExportService {
         logger.info("开始导出数据, type: {}, timeRange: [{}, {}]", exportType,
                 request.getStartTime(), request.getEndTime());
 
+        List<ApiCallLog> logs = apiCallLogMapper.selectForExport(
+                exportType, request.getStartTime(), request.getEndTime(), maxRecords);
+
         try (Workbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
 
@@ -62,16 +75,22 @@ public class ExportServiceImpl implements ExportService {
             headerRow.createCell(3).setCellValue("调用时间");
             headerRow.createCell(4).setCellValue("响应码");
 
-            // 写入示例数据（实际场景应查询数据库）
-            Row dataRow = sheet.createRow(1);
-            dataRow.createCell(0).setCellValue(1);
-            dataRow.createCell(1).setCellValue(exportType);
-            dataRow.createCell(2).setCellValue("sample_user");
-            dataRow.createCell(3).setCellValue("2026-09-01 12:00:00");
-            dataRow.createCell(4).setCellValue("OK");
+            SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            int rowIndex = 1;
+            for (ApiCallLog log : logs) {
+                Row dataRow = sheet.createRow(rowIndex);
+                dataRow.createCell(0).setCellValue(rowIndex);
+                dataRow.createCell(1).setCellValue(log.getApiName());
+                dataRow.createCell(2).setCellValue(log.getUserId());
+                String callTime = log.getGmtCreate() != null
+                        ? sdf.format(log.getGmtCreate()) : "";
+                dataRow.createCell(3).setCellValue(callTime);
+                dataRow.createCell(4).setCellValue(log.getResponseCode());
+                rowIndex++;
+            }
 
             workbook.write(bos);
-            logger.info("导出完成, type: {}, 记录数: 1", exportType);
+            logger.info("导出完成, type: {}, 记录数: {}", exportType, logs.size());
             return bos.toByteArray();
 
         } catch (BusinessException e) {
