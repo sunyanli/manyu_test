@@ -1,16 +1,16 @@
 # Code Review Report — 三接口演示平台
 
-## Review summary
-
-Review target: 三接口演示平台跨仓实现（manyu_test 后端 + manyu_test1 前端），覆盖 helloworld / SHA256 哈希 / 冒泡排序三个计算接口、埋点中间件、CSV 导出、维度聚合分析、前端三 Tab 页面及 ECharts 可视化报表。
+**Review target**: 全量代码变更（manyu_test 后端 + manyu_test1 前端）
+**Review date**: 2026-09-01
+**Design doc**: `.agents/20260901-分别写三个接口helloworld_哈希/design.md`
 
 ---
 
 ## Project profile
 
-State: CREATED_AND_USED
-Source: manyu_test/REVIEW.md (newly created)
-Notes: 项目此前无 REVIEW.md，基于设计文档和代码结构生成了包含跨仓对齐规则的评审配置文件。
+**State**: FOUND_AND_USED
+**Source**: `manyu_test-cred-test-20260716022903/REVIEW.md`
+**Notes**: 项目特定的 REVIEW.md 已存在，包含后端 (Python/FastAPI/SQLite) 和前端 (HTML/JS/ECharts) 的门禁规则，以及跨仓对齐约束。所有 lane 均基于此 profile 执行。
 
 ---
 
@@ -18,20 +18,91 @@ Notes: 项目此前无 REVIEW.md，基于设计文档和代码结构生成了包
 
 | Lane | Verdict | Notes |
 |---|---|---|
-| align | APPROVE | 实现与设计文档 §4-§5 的 API 契约完全一致，Header 命名、维度枚举值、导出 CSV 列名、端口号等跨仓对齐点均匹配。 |
-| design | APPROVE_WITH_COMMENTS | 存在 SQL 注入风险（f-string 拼接）、sys.path hacks 导入、模块导入时副作用初始化等设计问题。 |
-| trim | APPROVE_WITH_COMMENTS | 存在未使用的 HTTPException 导入、StreamingResponse 非真流式等可精简项。 |
-| cause | NOT_RUN | 本次为全新功能开发，非 bug 修复，无需 root-cause 审查。 |
-| verify | REJECT | 发现前端未捕获异常（unhandled promise rejection）、测试用例时序依赖（async 写入未等待）、SQLite 并发写入风险、ECharts 事件监听器泄漏等实现缺陷。 |
+| Align | APPROVE_WITH_COMMENTS | 实现与设计文档高度一致；API 契约、跨仓 Header、维度枚举、CSV 列均对齐。缺少数据库索引。 |
+| Design | REJECT | `sys.path.insert` hack 违反项目门禁；BASE_URL 硬编码违反可配置性要求。 |
+| Trim | APPROVE_WITH_COMMENTS | `HashResponse.input` 字段名遮蔽 Python 内置函数；`HTTPException` 导入未使用。 |
+| Cause | NOT_RUN | 本次为全新功能开发，非 bug 修复，无 root-cause 分析上下文。 |
+| Verify | REJECT | SQL f-string 插值违反参数化查询门禁；ECharts resize 事件监听器内存泄漏；bubble-sort 输入解析未捕获异常。 |
 
 ---
 
 ## Blocking findings
 
-### [HIGH] [VERIFY] [IMPLEMENTATION-BUG] manyu_test1/js/app.js:128-132
-bubble-sort 的输入解析逻辑中 `throw new Error(...)` 位于 `.map()` 回调内，且该 `.map()` 调用在 try/catch 块之外，导致非数字输入时抛出未捕获的 Promise rejection，用户看不到错误提示。
+### [CRITICAL] [VERIFY] [IMPLEMENTATION-BUG] apis/analytics.py:24,41 — SQL 查询使用 f-string 插值
 
-Evidence:
+**Evidence**:
+- `analytics.py:24`: `query = f"SELECT {dimension}, COUNT(*) as cnt FROM api_call_logs"`
+- `analytics.py:41`: `query += f" GROUP BY {dimension} ORDER BY cnt DESC"`
+- `REVIEW.md:10`: "SQL queries must use parameterized queries; f-string interpolation into SQL is forbidden even with whitelist validation."
+
+**Recommendation**: 将 `dimension` 到列名的映射改为显式字典查找，避免 f-string 拼接 SQL：
+
+```python
+COLUMN_MAP = {"dept": "dept", "level": "level", "user_type": "user_type"}
+col = COLUMN_MAP[dimension]  # dimension 已通过 VALID_DIMENSIONS 校验
+query = f"SELECT {col}, COUNT(*) as cnt FROM api_call_logs"
+```
+
+> 注：虽然 `dimension` 已经过 `VALID_DIMENSIONS` 白名单校验，但项目门禁明确要求"即使有白名单校验也不允许 SQL f-string 插值"。该规则旨在防止后续维护中新增维度时遗忘校验而导致注入风险。
+
+---
+
+### [HIGH] [DESIGN] [BOUNDARY-LEAK] apis/bubble_sort.py:4 — sys.path.insert 导入 hack
+
+**Evidence**:
+- `apis/bubble_sort.py:4`: `sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))`
+- `apis/bubble_sort.py:5`: `from bubble_sort import bubble_sort as bs`
+- `REVIEW.md:12`: "`sys.path.insert` hacks for cross-module imports are not allowed; use proper package structure."
+
+**Recommendation**: 将根目录的 `bubble_sort.py` 移入包内（如 `apis/` 或新建 `lib/`），使用标准相对导入：
+
+```python
+from .bubble_sort import bubble_sort as bs
+```
+
+---
+
+### [HIGH] [VERIFY] [LIFECYCLE] js/charts.js:54-56 — ECharts resize 事件监听器内存泄漏
+
+**Evidence**:
+- `charts.js:54-56`: 每次 `renderChart()` 调用都添加新的 `window.addEventListener('resize', ...)` 而不移除旧监听器
+- `app.js:189`: 初始化时调用 `loadAnalytics()`
+- `app.js:105,118,136`: 每次 API 调用后 `loadAnalytics()`
+- `app.js:173,183`: 切换维度/图表类型时 `loadAnalytics()`
+- `REVIEW.md:17`: "Event listeners must be cleaned up to avoid memory leaks (especially ECharts resize)."
+
+**Recommendation**: 使用具名函数并在注册前移除旧监听器：
+
+```javascript
+function onResize() {
+    chartInstance && chartInstance.resize();
+}
+window.removeEventListener('resize', onResize);
+window.addEventListener('resize', onResize);
+```
+
+---
+
+### [HIGH] [DESIGN] [BOUNDARY-LEAK] js/app.js:2 — BASE_URL 硬编码为 localhost
+
+**Evidence**:
+- `app.js:2`: `const BASE_URL = 'http://localhost:8000';`
+- `REVIEW.md:18`: "BASE_URL must be configurable, not hardcoded to localhost."
+
+**Recommendation**: 从页面元素或 URL 参数读取后端地址，支持部署时动态配置：
+
+```javascript
+const BASE_URL = document.getElementById('backendUrl').textContent
+    || window.location.origin.replace(/:\d+$/, ':8000');
+```
+
+---
+
+### [HIGH] [VERIFY] [IMPLEMENTATION-BUG] js/app.js:128-132 — bubble-sort 输入解析未捕获异常
+
+**Evidence**:
+- `app.js:128-132`: `throw new Error(...)` 在 `.map()` 回调中执行，位于 `try/catch` 块之外，导致非数字输入时抛出未捕获异常，用户看不到错误提示。
+
 ```javascript
 var numbers = raw.split(',').map(function(s) {   // line 128
     var n = parseFloat(s.trim());
@@ -41,126 +112,69 @@ var numbers = raw.split(',').map(function(s) {   // line 128
 try {                                               // line 133
     var data = await apiCall('POST', '/api/bubble-sort', { numbers: numbers });
 ```
-Recommendation: 将 `.map()` 调用移入 try 块内，或将 map 中的 throw 改为返回标记值并在 try 块内统一校验。
 
----
-
-### [HIGH] [VERIFY] [TEST-GAP] manyu_test/tests/test_apis.py:70-76
-`TestExport.test_export_helloworld_csv` 仅校验了 HTTP 状态码和 Content-Type/Content-Disposition 头，未验证 CSV 内容是否包含埋点数据。由于埋点中间件使用 daemon 线程异步写入，测试可能在写入完成前执行查询，导致 CSV 仅含表头而无数据行，但测试仍通过。
-
-Evidence:
-```python
-def test_export_helloworld_csv(self):
-    client.post("/api/helloworld", headers={"X-User-Name": "ZhangSan"})
-    resp = client.get("/api/export/helloworld")
-    assert resp.status_code == 200
-    assert "text/csv" in resp.headers["content-type"]
-    # 未断言 CSV body 中包含 "ZhangSan"
-```
-Recommendation: 添加 `time.sleep(0.3)` 等待异步写入，并断言 CSV 响应体中包含预期的数据行。
-
----
-
-### [HIGH] [VERIFY] [TEST-GAP] manyu_test/tests/test_apis.py:83-93
-`TestAnalytics.test_analytics_by_dept` 在调用三个埋点 API 后立即查询 analytics，未等待异步写入线程完成，导致 `assert len(data["data"]) == 2` 可能在写入未完成时失败（实际上可能为 0 或 1）。
-
-Evidence:
-```python
-def test_analytics_by_dept(self):
-    client.post("/api/helloworld", headers={"X-User-Dept": "Tech"})
-    client.post("/api/hash", json={"text": "x"}, headers={"X-User-Dept": "Tech"})
-    client.post("/api/bubble-sort", json={"numbers": [1]}, headers={"X-User-Dept": "Product"})
-    resp = client.get("/api/analytics?dimension=dept")  # 无 sleep
-    assert len(data["data"]) == 2  # 竞态条件
-```
-Recommendation: 在 analytics 查询前添加 `time.sleep(0.3)` 等待异步写入完成。
-
----
-
-### [HIGH] [DESIGN] [BOUNDARY-LEAK] manyu_test/apis/analytics.py:24
-`dimension` 参数虽经 `VALID_DIMENSIONS` 白名单校验，但仍以 f-string 直接拼接进 SQL 查询。若未来有人新增维度枚举值但忘记在代码中做转义，或白名单校验被绕过，将导致 SQL 注入。
-
-Evidence:
-```python
-query = f"SELECT {dimension}, COUNT(*) as cnt FROM api_call_logs"  # line 24
-```
-Recommendation: 使用白名单映射将 dimension 转换为硬编码的列名，而非 f-string 拼接：
-```python
-column_map = {"dept": "dept", "level": "level", "user_type": "user_type"}
-col = column_map[dimension]  # 已在白名单校验后，安全
-query = f"SELECT {col}, COUNT(*) as cnt FROM api_call_logs"
-```
-
----
-
-### [HIGH] [VERIFY] [CONCURRENCY] manyu_test/middleware/tracking.py:21-25
-在 FastAPI async 上下文中使用 `threading.Thread`（daemon）写入 SQLite。SQLite 默认串行化写入，多线程并发时可能出现 `database is locked` 错误。虽然每次 `insert_log` 创建新连接，但高并发下仍存在写入失败风险，且 daemon 线程的异常被静默吞没。
-
-Evidence:
-```python
-threading.Thread(
-    target=insert_log,
-    args=(get_db_path(), api_name, caller_id, caller_name, dept, level, user_type),
-    daemon=True,
-).start()
-```
-Recommendation: 添加 `check_same_thread=False` 到 SQLite 连接参数，或使用 `threading.Lock` 保护写入操作，或使用 `asyncio.to_thread` 替代裸 `threading.Thread`。
+**Recommendation**: 将 `.map()` 调用移入 try 块内，或将 map 中的 throw 改为返回标记值并在 try 块内统一校验。
 
 ---
 
 ## Advisory findings
 
-### [WARNING] [TRIM] [DEAD-CODE] manyu_test/apis/bubble_sort.py:7
-`HTTPException` 导入未被使用。该模块的所有错误处理均依赖 Pydantic 自动校验。
+### [WARNING] [DESIGN] [OBSERVABILITY-GAP] middleware/tracking.py:21-25 — 埋点异步写入无错误日志
 
-Recommendation: 移除 `from fastapi import APIRouter, HTTPException` 中未使用的 `HTTPException`。
-
----
-
-### [WARNING] [TRIM] [DEAD-CODE] manyu_test/apis/hash_api.py:1
-`HTTPException` 导入未被使用。hash 接口的错误处理完全依赖 Pydantic `Field(min_length=1)` 自动校验。
-
-Recommendation: 移除 `from fastapi import APIRouter, HTTPException` 中未使用的 `HTTPException`。
+**Evidence**: `tracking.py:21-25` 中 daemon 线程的 `insert_log()` 调用无 try/except，写入失败时静默丢弃。虽然设计文档允许"异步线程静默失败"，但建议至少添加 `logging.warning()` 以便排查问题。
 
 ---
 
-### [WARNING] [VERIFY] [BOUNDARY-CASE] manyu_test1/js/charts.js:54-56
-每次调用 `renderChart()` 都会通过 `window.addEventListener('resize', ...)` 注册新的 resize 监听器，但从未移除旧的监听器。多次切换维度/图表类型后会累积大量监听器，导致内存泄漏和性能下降。
+### [WARNING] [TRIM] [PUBLIC-SURFACE] apis/hash_api.py:14 — HashResponse.input 字段名遮蔽 Python 内置函数
 
-Evidence:
-```javascript
-window.addEventListener('resize', function() {  // line 54 — 每次 renderChart 都新增
-    chartInstance && chartInstance.resize();
-});
-```
-Recommendation: 使用具名函数并在添加新监听器前移除旧的，或使用 `{ once: false }` 模式配合标记变量避免重复注册。
+**Evidence**: `hash_api.py:14`: `input: str` — 字段名 `input` 与 Python 内置函数 `input()` 同名。虽然 Pydantic 模型字段不会造成运行时冲突，但 IDE 和静态分析工具可能产生误报。建议改为 `input_text` 或 `source`。
 
 ---
 
-### [WARNING] [DESIGN] [WRONG-LAYER] manyu_test/apis/bubble_sort.py:4-5
-使用 `sys.path.insert(0, ...)` 动态修改模块搜索路径来导入根目录的 `bubble_sort.py`，这是脆弱且非标准的做法。若项目结构调整或部署环境变化，导入将失败。
+### [WARNING] [TRIM] [DEAD-CODE] apis/bubble_sort.py:7, apis/hash_api.py:1 — HTTPException 导入未使用
 
-Evidence:
-```python
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from bubble_sort import bubble_sort as bs
-```
-Recommendation: 将 `bubble_sort.py` 移至 `apis/` 或项目包内，使用标准相对/绝对导入；或将算法逻辑封装为独立模块并通过 `setup.py` / `pyproject.toml` 安装。
+**Evidence**: `bubble_sort.py:7` 和 `hash_api.py:1` 中的 `HTTPException` 导入未被使用。两个接口的错误处理均依赖 Pydantic 自动校验。
+
+**Recommendation**: 移除未使用的 `HTTPException` 导入。
 
 ---
 
-### [WARNING] [TRIM] [DATA-EXPOSURE] manyu_test/export/csv_writer.py:33-34
-`StreamingResponse(iter([output.getvalue()]), ...)` 将整个 CSV 内容一次性加载到内存后返回，并非真正的流式传输。大数据量时可能导致内存压力。
+### [WARNING] [VERIFY] [TEST-GAP] tests/test_apis.py — 测试用例时序依赖与覆盖不足
 
-Evidence:
-```python
-output.seek(0)
-return StreamingResponse(
-    iter([output.getvalue()]),  # 一次性读取全部内容
-    ...
-)
-```
-Recommendation: 使用生成器逐行 yield CSV 内容，或使用 `io.BytesIO` 配合分块读取以实现真正的流式响应。
+**Evidence**:
+- `test_export_helloworld_csv` (line 71-76): 未验证 CSV 内容是否包含埋点数据，仅校验了 HTTP 头和状态码。异步写入可能未完成。
+- `test_analytics_by_dept` (line 84-93): 在调用埋点 API 后立即查询 analytics，未等待异步写入线程完成，存在竞态条件。
+- 缺少: analytics 带 `api_name` 过滤参数、export 空数据 CSV、bubble-sort 非数字元素测试。
+
+**Recommendation**: 在异步写入后添加 `time.sleep(0.3)` 等待，并断言 CSV 响应体内容；补充缺失的边界测试用例。
+
+---
+
+### [WARNING] [TRIM] [DATA-EXPOSURE] export/csv_writer.py:33-34 — StreamingResponse 非真流式
+
+**Evidence**: `StreamingResponse(iter([output.getvalue()]), ...)` 将整个 CSV 内容一次性加载到内存后返回，并非真正的流式传输。
+
+**Recommendation**: 使用生成器逐行 yield CSV 内容以实现真正的流式响应。
+
+---
+
+### [INFO] [ALIGN] [DOC-DRIFT] models/tracking.py — 缺少设计文档中声明的索引
+
+**Evidence**: 设计文档 `design.md:516-521` 声明了 `api_name`、`dept`、`level`、`user_type` 四个索引，但 `tracking.py:13-26` 的 `init_db()` 仅创建表，未创建任何索引。
+
+**Recommendation**: 在 `init_db()` 中添加 `CREATE INDEX IF NOT EXISTS` 语句。
+
+---
+
+### [INFO] [ALIGN] [API-CONTRACT] — 跨仓 Header 契约一致性验证通过
+
+**Evidence**:
+- 后端 `tracking.py:15-19`: 读取 `X-User-Id`, `X-User-Name`, `X-User-Dept`, `X-User-Level`, `X-User-Type`
+- 前端 `app.js:19-25`: 发送 `X-User-Id`, `X-User-Name`, `X-User-Dept`, `X-User-Level`, `X-User-Type`
+- API 路径: `/api/helloworld`, `/api/hash`, `/api/bubble-sort`, `/api/export/{type}`, `/api/analytics`
+- 维度枚举: `dept`, `level`, `user_type` — 前后端一致
+
+所有跨仓对齐点均已验证通过，无契约漂移。
 
 ---
 
@@ -168,19 +182,25 @@ Recommendation: 使用生成器逐行 yield CSV 内容，或使用 `io.BytesIO` 
 
 | Lane | Reason |
 |---|---|
-| cause | 本次为全新功能开发，非 bug 修复场景，无需进行 root-cause closure 审查。 |
+| Cause | 本次变更为全新功能开发，非 bug 修复或 root-cause 分析场景，缺少 Cause lane 所需的最小上下文。 |
 
 ---
 
 ## Suggested next actions
 
-1. **修复 [HIGH] app.js:128-132**：将 bubble-sort 的输入解析移入 try/catch 块内。
-2. **修复 [HIGH] test_apis.py:70-76,83-93**：在异步写入测试中添加 `time.sleep` 等待，并断言 CSV 内容。
-3. **修复 [HIGH] analytics.py:24**：用列名映射替代 f-string SQL 拼接。
-4. **修复 [HIGH] middleware/tracking.py:21-25**：为 SQLite 并发写入添加保护机制。
-5. **清理 [WARNING]**：移除未使用的 `HTTPException` 导入，修复 charts.js 事件监听器泄漏。
-6. **重构 [WARNING]**：消除 `sys.path.insert` hack，改用标准包导入。
+1. **P0**: 修复 `analytics.py` 的 SQL f-string 插值，改为列名映射字典（CRITICAL）
+2. **P0**: 移除 `apis/bubble_sort.py` 的 `sys.path.insert` hack，改为正确的包导入（HIGH）
+3. **P0**: 修复 `charts.js` 的 resize 事件监听器内存泄漏（HIGH）
+4. **P0**: 使 `BASE_URL` 可配置，而非硬编码 localhost（HIGH）
+5. **P0**: 修复 `app.js` bubble-sort 输入解析的未捕获异常（HIGH）
+6. **P1**: 为 `init_db()` 添加设计文档中声明的索引
+7. **P1**: 补充测试用例的异步等待和边界场景覆盖
+8. **P2**: 为埋点异步写入线程添加错误日志
+9. **P2**: 重命名 `HashResponse.input` 为 `input_text` 避免内置函数遮蔽
+10. **P2**: 移除未使用的 `HTTPException` 导入
 
 ---
 
-VERDICT: **REJECT**
+## VERDICT: **REJECT**
+
+5 个 blocking findings（1 CRITICAL + 4 HIGH）需要修复后方可合入。
