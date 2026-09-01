@@ -1,0 +1,39 @@
+{
+  "task_id": "DEV-9d10e310-7901-11f1-8a9f-59ecae612580-1bde062f-e608-4ffe-aedf-004ab8c93b57",
+  "stage": "review",
+  "verdict": "REJECT",
+  "blocker_count": 4,
+  "review_date": "2026-09-01",
+  "profile_state": "FOUND_AND_USED",
+  "lane_verdicts": {
+    "align": "REJECT",
+    "design": "REJECT",
+    "trim": "APPROVE_WITH_COMMENTS",
+    "cause": "NOT_RUN",
+    "verify": "REJECT"
+  },
+  "findings_summary": {
+    "critical": 1,
+    "high": 3,
+    "warning": 3,
+    "info": 1
+  },
+  "repos": {
+    "manyu_test": {
+      "branch": "AI/task-DEV-9d10e310-7901-11f1-8a9f-59ecae612580-1bde062f-e608-4ffe-aedf-004ab8c93b57",
+      "base": "cred-test-20260716022903",
+      "files_changed": 28
+    },
+    "manyu_test1": {
+      "branch": "AI/task-DEV-9d10e310-7901-11f1-8a9f-59ecae612580-1bde062f-e608-4ffe-aedf-004ab8c93b57",
+      "base": "main",
+      "files_changed": 4
+    }
+  },
+  "top_blockers": [
+    "ApiCallLogMapper.dimensionStats SQL 注入漏洞 (${dimension})",
+    "TrackingServiceImpl.recordCall 维度字段硬编码为 unknown，报表功能无法使用",
+    "CallStatsRequest dimension/dimensionValue 筛选未生效",
+    "缺少 TrackingServiceImpl 和 ExportServiceImpl 单元测试"
+  ]
+}
