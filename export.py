@@ -14,7 +14,7 @@ def export_to_csv(tab: str = None):
     if not records:
         return ""
 
-    fieldnames = ["id", "timestamp", "api", "caller", "user_type", "user_level", "department"]
+    fieldnames = ["id", "timestamp", "api", "action", "caller", "user_type", "user_level", "department"]
     writer = csv.DictWriter(output, fieldnames=fieldnames)
     writer.writeheader()
     for record in records:
