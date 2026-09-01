@@ -6,9 +6,24 @@
   "confirmed_decisions": [
     "技术栈：Python Flask + 原生HTML/JS/CSS",
     "仓库分配：manyu_test = 后端仓库，manyu_test1 = 前端仓库",
-    "哈希算法：SHA256 + MD5 双算法支持"
+    "哈希算法：SHA256 + MD5 双算法支持",
+    "调用人识别：页面输入用户名（简单方案，无登录认证）",
+    "存储方式：内存存储（重启丢失可接受）",
+    "导出方案：方案 C（前端导出 API 调用结果 + 后端导出埋点数据）",
+    "前端可视化库：ECharts 5.x CDN 引入",
+    "冒泡排序：复用已有 bubble_sort.py，包装为 Flask 接口"
   ],
   "pending_clarifications": [],
+  "step_review": {
+    "phase": "clarification",
+    "approach": "基于已有设计文档 dima.md 和 plan.md，逐项确认所有设计决策已收敛。未发现需要进一步澄清的开放性问题。",
+    "key_ambiguities_resolved": [
+      "导出方案：方案 C（前端浏览器端导出 API 调用结果 CSV + 后端导出埋点数据 CSV），export 接口恢复为仅导出埋点数据",
+      "用户维度数据来源：前端页面用户信息表单输入",
+      "仓库分配：manyu_test 后端，manyu_test1 前端"
+    ],
+    "next_steps": "进入实施计划阶段，按 plan.md 的 Task 1~8 逐步实现"
+  },
   "outputs": [
     ".agents/20260901-分别写三个接口helloworld_哈希/dima.md"
   ]

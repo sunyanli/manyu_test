@@ -9,7 +9,7 @@
 **Tech Stack:**
 - 后端：Python 3 + Flask + flask-cors
 - 前端：原生 HTML5 + CSS3 + JavaScript (ES6) + ECharts (CDN)
-- 数据格式：JSON（API 通信）/ CSV（导出）
+- 导出格式：后端 CSV（埋点数据），前端浏览器端 CSV（API 调用结果）
 - 存储：Python 内存数据结构（list/dict）
 
 ---
@@ -458,14 +458,15 @@ Expected: `{"labels":["developer"],"values":[1],"dimension":"user_type","chart_t
 
 ---
 
-## Task 5: 导出接口
+## Task 5: 后端导出接口（埋点数据 CSV）
 
 **Files:**
 - Create: `manyu_test/export.py`
 - Modify: `manyu_test/app.py`（添加 /api/export 路由）
 
 **Interfaces:**
-- Produces: `GET /api/export?tab=hello` → CSV 文件下载（Content-Type: text/csv）
+- Produces: `GET /api/export?tab=hello` → 埋点统计数据 CSV 下载（Content-Type: text/csv）
+- 方案 C：后端仅导出埋点数据，API 调用结果由前端处理
 
 - [ ] **Step 1: 创建 export.py**
 
@@ -518,6 +519,45 @@ def api_export():
 
 Run: `curl "http://localhost:5000/api/export?tab=hello" -o /tmp/export_test.csv`
 Expected: 下载 CSV 文件，包含埋点数据表头和数据行
+
+---
+
+## Task 5b: 前端导出 API 调用结果（浏览器端 CSV）
+
+**Files:**
+- Modify: `manyu_test1/app.js`（添加前端 CSV 导出函数）
+
+**设计说明:** 方案 C 的 API 调用结果由前端直接生成 CSV。每次调用 API 后，前端已将结果展示在 result-area 中，`exportResultData()` 函数读取当前活跃 Tab 的展示内容，组装为 CSV 并通过 Blob 触发下载。
+
+- [ ] **Step 1: 在 app.js 中添加前端导出函数**
+
+```javascript
+// ==================== 前端导出 API 调用结果 ====================
+function exportResultData() {
+    // 获取当前活跃 Tab
+    const activeTab = document.querySelector('.tab-btn.active');
+    if (!activeTab) return;
+    const tabName = activeTab.dataset.tab;
+    const resultDiv = document.getElementById('result-' + tabName);
+    if (!resultDiv || !resultDiv.textContent || resultDiv.textContent === '点击按钮查看结果' || resultDiv.textContent === '输入文本并选择算法后点击按钮' || resultDiv.textContent === '输入数组后点击按钮' || resultDiv.textContent === '调用中...') {
+        alert('当前 Tab 暂无 API 调用结果，请先调用接口');
+        return;
+    }
+    
+    const content = resultDiv.textContent;
+    let csvContent = 'data:text/csv;charset=utf-8,\\uFEFF';
+    csvContent += 'Tab,内容\\n';
+    csvContent += `${tabName},"${content.replace(/"/g, '""')}"\\n`;
+    
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `result_${tabName}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+```
 
 ---
 
@@ -676,7 +716,9 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:
                 <option value="hash">哈希算法</option>
                 <option value="sort">冒泡排序</option>
             </select>
-            <button class="btn btn-export" onclick="exportData()">导出 CSV</button>
+            <button class="btn btn-export" onclick="exportData()">导出埋点 CSV</button>
+            <span style="margin:0 8px;color:#999;">|</span>
+            <button class="btn" onclick="exportResultData()" style="background:#722ed1;">导出当前结果 CSV</button>
         </div>
 
         <!-- 图表区域 -->
