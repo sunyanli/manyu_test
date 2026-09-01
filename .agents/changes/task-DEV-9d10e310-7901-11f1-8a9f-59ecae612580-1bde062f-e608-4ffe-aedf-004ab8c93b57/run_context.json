@@ -2,7 +2,7 @@
   "task_id": "DEV-9d10e310-7901-11f1-8a9f-59ecae612580-1bde062f-e608-4ffe-aedf-004ab8c93b57",
   "stage": "review",
   "verdict": "REJECT",
-  "blocker_count": 7,
+  "blocker_count": 9,
   "review_date": "2026-09-01",
   "profile_state": "FOUND_AND_USED",
   "lane_verdicts": {
@@ -14,8 +14,8 @@
   },
   "findings_summary": {
     "critical": 3,
-    "high": 4,
-    "warning": 7,
+    "high": 6,
+    "warning": 3,
     "info": 0
   },
   "repos": {
@@ -34,9 +34,11 @@
     "TrackingServiceImpl.recordCall 仅打日志，未写入数据库",
     "ReportController 返回硬编码 Mock 数据",
     "ExportServiceImpl 返回硬编码 Mock 数据",
-    "缺少 CORS 跨域配置",
+    "ReportController/ExportController 绕过 GlobalExceptionHandler 自处理异常",
     "前端未发送 X-User-Id Header",
-    "缺少数据持久层 Entity/Mapper",
-    "BubbleSortVO durationMs 字段命名不一致"
+    "缺少 CORS 跨域配置",
+    "TrackingServiceImpl 缺少单元测试",
+    "ExportServiceImpl 缺少单元测试",
+    "ReportController.validateTimeRange 未校验90天限制"
   ]
 }

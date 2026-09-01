@@ -1,114 +1,164 @@
-# 代码评审报告 — 算法展示与监控子系统
+# Code Review Report — 算法展示与监控子系统
 
-> **评审日期**: 2026-09-01
-> **评审范围**: manyu_test (后端 Java) + manyu_test1 (前端 React)
-> **系分文档**: `.agents/20260901-分别写三个接口helloworld_哈希/design.md`
-> **实现文档**: `.agents/20260901-分别写三个接口helloworld_哈希/impl.md`
+> **Review Target**: manyu_test (Java 后端) + manyu_test1 (React 前端)
+> **Requirement**: 三个接口 (helloworld/hash/bubble-sort) + 导出 + 埋点 + 可视化报表
+> **Review Date**: 2026-09-01
 
 ---
 
 ## Project Profile
 
-| 项目 | 内容 |
-|------|------|
-| State | `FOUND_AND_USED` |
-| Source | `REVIEW.md` (root) |
-| Notes | 项目级评审门禁已覆盖跨仓契约、数据完整性、异常处理、测试四个维度，与当前变更匹配 |
+**State**: FOUND_AND_USED
+**Source**: `REVIEW.md` (manyu_test root)
+**Notes**: 已存在的 REVIEW.md 包含跨仓契约、数据完整性、异常处理、测试四个关卡，与当前项目上下文匹配，直接使用。
 
 ---
 
 ## Lane Verdict Table
 
 | Lane | Verdict | Notes |
-|------|---------|-------|
-| Align | `REJECT` | API 契约漂移：`durationMs` vs `duration_ms`；R10 90天限制未实现 |
-| Design | `REJECT` | 埋点/报表/导出均为 stub 硬编码，未集成数据库；缺少 CORS 配置；前端未发送用户身份 Header |
-| Trim | `APPROVE_WITH_COMMENTS` | 存在未使用字段和冗余异常处理，非阻塞 |
-| Verify | `REJECT` | TrackingService / ExportService / ReportController 零测试覆盖 |
-| Cause | `NOT_RUN` | 本次为全新功能开发，非 Bug 修复 |
+|---|---|---|
+| Align | REJECT | 需求声明 vs 实际产出存在多处漂移（埋点未落库 / 报表为 mock 数据 / 导出为 mock 数据），前端未发送 X-User-Id 头，无 CORS 配置 |
+| Design | REJECT | ReportController 和 ExportController 在 Controller 层自行捕获异常返回 ApiResponse，绕过 GlobalExceptionHandler，设计不一致 |
+| Trim | APPROVE_WITH_COMMENTS | 代码整体精简，存在少量可优化项（冗余 try-catch-rethrow、axios 未使用） |
+| Cause | NOT_RUN | 本次为全新开发，非缺陷修复，无 root-cause 分析场景 |
+| Verify | REJECT | 埋点/导出/报表三大模块均为 mock 实现无真实数据通路；TrackingService 和 ExportService 缺少单元测试；ReportController 90 天限制未生效 |
 
 ---
 
-## Blocking Findings (CRITICAL + HIGH)
+## Blocking Findings
 
-### CRITICAL
+### [CRITICAL] [ALIGN] [DATA-INTEGRITY] TrackingServiceImpl.java:28-29 — 埋点仅写日志，未持久化到数据库
 
-#### [CRITICAL] [DESIGN] [BOUNDARY-LEAK] TrackingServiceImpl 未写入数据库
-- **路径**: `manyu_test/src/main/java/com/example/demo/tracking/service/impl/TrackingServiceImpl.java:23-33`
-- **证据**: `recordCall()` 仅执行 `logger.info(...)`，未调用任何 Mapper/DAO 向 `api_call_log` 表写入数据。`schema.sql` 已定义 `api_call_log` 表结构，`application.yml` 已配置 MyBatis-Plus 和 MySQL 数据源，但 `TrackingServiceImpl` 未注入任何 Mapper。
-- **影响**: 所有埋点数据静默丢失，报表和导出功能无数据源。
-- **建议**: 创建 `ApiCallLogMapper` / `ApiCallLog` Entity，在 `TrackingServiceImpl` 中注入并调用 `mapper.insert(entity)`。
+**Evidence**:
+- `TrackingServiceImpl.recordCall()` 仅调用 `logger.info(...)` 记录日志，未注入任何 Mapper/Repository 执行数据库 INSERT
+- `schema.sql` 已定义 `api_call_log` 表 (含 api_name, user_id, user_type, user_level, user_department 等字段)
+- `pom.xml` 已引入 MyBatis-Plus 依赖，但未使用
+- 注释标注 "同步记录到数据库"，与实现矛盾
 
-#### [CRITICAL] [DESIGN] [WRONG-LAYER] ReportController 返回硬编码 Mock 数据
-- **路径**: `manyu_test/src/main/java/com/example/demo/tracking/controller/ReportController.java:52-57` (callStats), `:85-88` (dimensionStats)
-- **证据**: 两个方法均返回固定数组（如 `series.add(new SeriesPoint("2026-09-01", 15))`），代码注释明确标注"实际应查询数据库"。未调用任何 Mapper 或 Service 查询 `api_call_log` 表。
-- **影响**: 报表功能完全不可用，无法反映真实调用数据。
-- **建议**: 在 `TrackingService` 中新增 `queryCallStats()` / `queryDimensionStats()` 方法，实现数据库聚合查询；Controller 调用 Service 而非构造 Mock 数据。
-
-#### [CRITICAL] [DESIGN] [WRONG-LAYER] ExportServiceImpl 返回硬编码 Mock 数据
-- **路径**: `manyu_test/src/main/java/com/example/demo/export/service/impl/ExportServiceImpl.java:66-71`
-- **证据**: 仅写入一条固定示例数据行（`"sample_user"`, `"2026-09-01 12:00:00"`），未查询 `api_call_log` 表。`export_record` 表也未写入。
-- **影响**: 导出功能完全不可用，只能下载含一条固定数据的 Excel。
-- **建议**: 注入 `ApiCallLogMapper`，按 `exportType` 和时间范围查询数据库，将结果写入 Excel。
+**Recommendation**: 注入 MyBatis-Plus Mapper，在 `recordCall()` 中构造 `ApiCallLog` 实体 INSERT 到 `api_call_log` 表。同时需查询 `user_info` 表获取用户维度信息 (user_type/user_level/user_department)，或使用默认值 "unknown"。
 
 ---
 
-### HIGH
+### [CRITICAL] [ALIGN] [DATA-INTEGRITY] ReportController.java:51-56, 85-88 — 报表接口返回硬编码 mock 数据
 
-#### [HIGH] [ALIGN] [API-CONTRACT] BubbleSortVO JSON 字段名与设计文档不一致
-- **路径**: `manyu_test/src/main/java/com/example/demo/algorithm/model/vo/BubbleSortVO.java:22`
-- **证据**: Java 字段 `durationMs` → Jackson 默认序列化为 `"durationMs"`。设计文档 §5.1.2 W03 出参定义为 `duration_ms`（蛇形命名）。前端代码未直接引用此字段（通过 JSON.stringify 展示），但若后续前端按设计文档解析 `duration_ms` 将获取 `undefined`。
-- **建议**: 添加 `@JsonProperty("duration_ms")` 注解，或在 `application.yml` 中配置 `spring.jackson.property-naming-strategy: SNAKE_CASE`。
+**Evidence**:
+- `callStats()` 方法 (line 51-56) 直接构造固定时序数据 `[("2026-09-01", 15), ("2026-09-02", 23), ("2026-09-03", 18)]`，未查询 `api_call_log` 表
+- `dimensionStats()` 方法 (line 85-88) 直接构造固定维度数据 `["技术部", "产品部", "运营部"]`，未查询数据库
+- 注释标注 "实际应查询数据库"，但交付时未实现
+- 违反 REVIEW.md 关卡：Report queries must read from database, not mock data
 
-#### [HIGH] [ALIGN] [CLAIM-DRIFT] 时间范围 90 天限制未实现
-- **路径**: `manyu_test/src/main/java/com/example/demo/tracking/controller/ReportController.java:108-117`
-- **证据**: 设计文档 R10 明确要求"时间范围不能超过 90 天"，但 `validateTimeRange()` 仅校验了 null 和 start > end，未计算日期差并校验 90 天上限。
-- **建议**: 在 `validateTimeRange()` 中解析日期并计算差值，超过 90 天时抛出 `BusinessException(TRK_001, "时间范围不能超过90天")`。
-
-#### [HIGH] [DESIGN] [BOUNDARY-LEAK] 缺少 CORS 跨域配置
-- **路径**: `manyu_test` 项目全局
-- **证据**: 无 `@CrossOrigin` 注解、无 `CorsFilter` Bean、无 `WebMvcConfigurer.addCorsMappings()` 配置。前端 `API_BASE = 'http://localhost:8080'`（`manyu_test1/src/AlgorithmDashboard.js:4`），React 开发服务器默认运行在 `localhost:3000`，浏览器将因同源策略阻止所有 API 请求。
-- **建议**: 添加 `CorsConfig` 配置类，允许 `localhost:3000` 来源的跨域请求。
-
-#### [HIGH] [DESIGN] [OBSERVABILITY-GAP] 前端未发送用户身份 Header
-- **路径**: `manyu_test1/src/AlgorithmDashboard.js:15,44,86` (所有 fetch 调用)
-- **证据**: 后端 `AlgorithmController.getUserId()` 从 `X-User-Id` Header 读取用户 ID（默认 `"anonymous"`）。前端所有 `fetch()` 调用均未设置 `X-User-Id` Header。所有埋点记录的 `user_id` 将始终为 `"anonymous"`。
-- **建议**: 前端在 `fetch` 的 `headers` 中添加 `'X-User-Id': '<从登录态获取>'`。或在后端实现统一的 `Filter/Interceptor` 从 Session/Token 解析用户 ID。
+**Recommendation**: 在 TrackingService 中新增 `queryCallStats()` 和 `queryDimensionStats()` 方法，根据时间范围和维度参数从 `api_call_log` 表 (JOIN `user_info` 表) 执行 GROUP BY 聚合查询。
 
 ---
 
-## Advisory Findings (WARNING)
+### [CRITICAL] [ALIGN] [DATA-INTEGRITY] ExportServiceImpl.java:65-71 — 导出接口返回硬编码示例数据
 
-#### [WARNING] [ALIGN] [CONFIG-CONTRACT] 应急开关命名不一致
-- **路径**: `manyu_test/src/main/resources/application.yml:20`
-- **证据**: 设计文档 §7.3 定义开关名为 `track.enabled`，实际配置为 `tracking.enabled`。`TrackingServiceImpl` 读取 `${tracking.enabled:true}`。
-- **建议**: 统一为 `track.enabled` 或更新设计文档。
+**Evidence**:
+- `exportData()` 方法 (line 65-71) 仅写入一行 `sample_user` 的固定数据，未查询数据库
+- 注释标注 "实际场景应查询数据库"，但交付时未实现
+- 违反 REVIEW.md 关卡：Export must read from database, not mock data
 
-#### [WARNING] [DESIGN] [WRONG-LAYER] 异常处理模式不一致
-- **路径**: `AlgorithmController.java:47-50` / `ReportController.java:62-68` / `ExportController.java:57-64`
-- **证据**: AlgorithmController 捕获后 re-throw（依赖 GlobalExceptionHandler）；ReportController 捕获后直接 `return ApiResponse.error()`；ExportController 捕获后返回 `ResponseEntity.ok(ApiResponse.error())`。三种模式各异。
-- **建议**: 统一由 GlobalExceptionHandler 处理，Controller 不捕获异常（除非有特殊降级逻辑）。
+**Recommendation**: 根据 `exportType` 查询 `api_call_log` 表中对应 `api_name` 的记录，按时间范围筛选后写入 Excel。
 
-#### [WARNING] [DESIGN] [OBSERVABILITY-GAP] AlgorithmController 异常处理与 R08 冲突
-- **路径**: `manyu_test/src/main/java/com/example/demo/algorithm/controller/AlgorithmController.java:47-50`
-- **证据**: `trackingService.recordCall()` 与 `ApiResponse.success()` 在同一 try 块中。设计 R08 要求"埋点失败不影响主流程"。当前 TrackingServiceImpl 内部有 try-catch 兜底，但若未来 TrackingService 实现变更抛异常，主流程将被中断。
-- **建议**: 将 `trackingService.recordCall()` 移到 try-catch 外部，或使用 `try { recordCall() } catch { logger.warn }` 隔离。
+---
 
-#### [WARNING] [TRIM] 未使用的请求字段
-- `CallStatsRequest.dimensionValue` (manyu_test/.../CallStatsRequest.java:27) — 声明但未使用
-- `CallStatsRequest.granularity` (manyu_test/.../CallStatsRequest.java:21) — 声明但未使用
-- `DimensionStatsRequest.chartType` (manyu_test/.../DimensionStatsRequest.java:25) — 仅记录日志，不区分查询逻辑
-- **建议**: 删除未使用字段，或在实现中利用它们。
+### [HIGH] [DESIGN] [BOUNDARY-LEAK] ReportController.java:62-68, 96-102 / ExportController.java:57-64 — Controller 层自行捕获异常并构造响应，绕过 GlobalExceptionHandler
 
-#### [WARNING] [TRIM] AlgorithmController 冗余 catch-rethrow
-- **路径**: `manyu_test/src/main/java/com/example/demo/algorithm/controller/AlgorithmController.java:47-50, 62-65, 77-80`
-- **证据**: 三个方法均 catch Exception → log → re-throw。GlobalExceptionHandler 已统一处理所有异常，此 catch 块仅增加日志噪音。
-- **建议**: 删除 try-catch 块，由 GlobalExceptionHandler 统一处理。
+**Evidence**:
+- `ReportController`: `catch (BusinessException e)` 直接返回 `ApiResponse.error(...)`；`catch (Exception e)` 返回硬编码 `"B0001"`
+- `ExportController`: 同样在 Controller 层 catch 并 return `ResponseEntity.ok(ApiResponse.error(...))`
+- `AlgorithmController` 则依赖 `GlobalExceptionHandler` 统一处理异常
+- 同一项目内两种异常处理策略并存，维护者需同时理解两套路径
 
-#### [WARNING] [VERIFY] [TEST-GAP] 缺少 Service/Controller 测试覆盖
-- **路径**: `manyu_test/src/test/` 目录
-- **证据**: 仅 `AlgorithmServiceImplTest.java` 存在。`TrackingServiceImpl`、`ExportServiceImpl`、`ReportController`、`ExportController` 均无测试。
-- **建议**: 至少为 `TrackingServiceImpl`（数据库写入）和 `ExportServiceImpl`（Excel 生成）补充单元测试。
+**Recommendation**: 统一使用 `GlobalExceptionHandler` 处理所有异常。Controller 层不应有 try-catch 包裹业务逻辑。如需特殊处理，应在 Service 层抛出 BusinessException，由 GlobalExceptionHandler 统一拦截。
+
+---
+
+### [HIGH] [ALIGN] [API-CONTRACT] AlgorithmDashboard.js — 前端未发送 X-User-Id 请求头
+
+**Evidence**:
+- `AlgorithmController.getUserId()` 从 `HttpServletRequest.getHeader("X-User-Id")` 读取用户 ID
+- 前端 `AlgorithmDashboard.js` 中所有 fetch 请求仅设置 `Content-Type: application/json`，未设置 `X-User-Id` 头
+- REVIEW.md 要求：User identity header (X-User-Id) contract must be honored by both sides
+- 结果：所有埋点记录的 `user_id` 将始终为 `"anonymous"`
+
+**Recommendation**: 前端在所有 fetch 请求中添加 `X-User-Id` header（从 SSO 或登录态获取），或在请求拦截器中统一注入。
+
+---
+
+### [HIGH] [ALIGN] [CONFIG-CONTRACT] application.yml — 无 CORS 跨域配置
+
+**Evidence**:
+- 前端部署在 `localhost:3000` (React)，后端在 `localhost:8080` (Spring Boot) — 不同源
+- `application.yml` 中无任何 CORS 配置
+- REVIEW.md 要求：CORS must be configured for cross-origin frontend requests
+
+**Recommendation**: 添加 CORS 配置（WebMvcConfigurer.addCorsMappings 或 `@CrossOrigin` 注解），允许前端域名的跨域请求。
+
+---
+
+### [HIGH] [VERIFY] [TEST-GAP] TrackingServiceImpl.java — 缺少单元测试
+
+**Evidence**:
+- REVIEW.md 关卡：Unit tests required for all Service implementations
+- `AlgorithmServiceImpl` 有 12 个测试用例，但 `TrackingServiceImpl` 和 `ExportServiceImpl` 均无测试文件
+- 无法验证埋点记录逻辑的正确性
+
+**Recommendation**: 新增 `TrackingServiceImplTest`，覆盖：正常记录、tracking.enabled=false 跳过、异常时不影响主流程。
+
+---
+
+### [HIGH] [VERIFY] [TEST-GAP] ExportServiceImpl.java — 缺少单元测试
+
+**Evidence**:
+- 同上，`ExportServiceImpl` 无任何测试覆盖
+
+**Recommendation**: 新增 `ExportServiceImplTest`，覆盖：合法导出类型、非法导出类型抛异常、导出功能禁用、max-records 限制。
+
+---
+
+### [HIGH] [VERIFY] [BOUNDARY-CASE] ReportController.java:108-117 — validateTimeRange 未校验 90 天上限
+
+**Evidence**:
+- `validateTimeRange()` 仅校验 null 和 startTime > endTime
+- 错误码 `TRK_001` 描述为 "时间范围不能超过90天"，但代码中未执行该比较
+- 若传入 365 天范围，方法不会拒绝
+
+**Recommendation**: 在 `validateTimeRange()` 中解析日期字符串并计算差值，超过 90 天时抛出 `TRK_001`。
+
+---
+
+## Advisory Findings
+
+### [WARNING] [TRIM] [LOGIC-SIMPLIFICATION] AlgorithmController.java:43-50, 58-65, 73-80 — 冗余 try-catch-rethrow
+
+**Evidence**:
+- 三个接口方法中 `catch (Exception e) { logger.error(...); throw e; }` 仅记录日志后重新抛出
+- GlobalExceptionHandler 已全局捕获所有异常并记录日志
+- 该模式增加噪音，不提供额外价值
+
+**Recommendation**: 移除 try-catch 块，让异常自然传播到 GlobalExceptionHandler。
+
+---
+
+### [WARNING] [TRIM] [UNUSED-ABSTRACTION] package.json — axios 依赖已声明但未使用
+
+**Evidence**:
+- `package.json` 声明 `"axios": "^1.6.0"`
+- 前端代码全部使用原生 `fetch` API，未 import axios
+
+**Recommendation**: 移除 axios 依赖，或统一使用 axios 替代原生 fetch 以获得更好的错误处理。
+
+---
+
+### [WARNING] [VERIFY] [TEST-GAP] AlgorithmServiceImplTest — 缺少 request == null 的测试用例
+
+**Evidence**:
+- `computeHash()` 方法第一行检查 `request == null`，但测试中仅测试 `request.input == null` 场景
+- 缺少传入 `null` 作为 request 参数的测试
+
+**Recommendation**: 新增 `shouldThrowException_whenRequestNull` 测试。
 
 ---
 
@@ -116,37 +166,25 @@
 
 | Lane | Reason |
 |------|--------|
-| Cause | 本次为全新功能开发，非 Bug 修复，无 root-cause 分析场景 |
+| Cause | 本次为全新功能开发，非缺陷修复，无 root-cause 分析场景 |
 
 ---
 
 ## Suggested Next Actions
 
-1. **P0**: 实现 `TrackingServiceImpl` 数据库写入（创建 Mapper + Entity）
-2. **P0**: 实现 `ReportController` 数据库查询（替换 Mock 数据）
-3. **P0**: 实现 `ExportServiceImpl` 数据库查询（替换 Mock 数据）
-4. **P0**: 添加 CORS 配置
-5. **P0**: 前端添加 `X-User-Id` Header 传递
-6. **P1**: 修复 `durationMs` JSON 序列化字段名
-7. **P1**: 实现 R10 90 天时间范围校验
-8. **P1**: 补充 TrackingService / ExportService 单元测试
-9. **P2**: 统一异常处理模式
-10. **P2**: 清理未使用的请求字段
+1. **P0**: 实现 TrackingServiceImpl 的数据库持久化（注入 Mapper，INSERT api_call_log）
+2. **P0**: 实现 ReportController 的数据库查询（聚合 api_call_log + user_info）
+3. **P0**: 实现 ExportServiceImpl 的数据库查询
+4. **P1**: 统一异常处理策略 — 移除 Controller 层 try-catch，统一走 GlobalExceptionHandler
+5. **P1**: 前端添加 X-User-Id 请求头
+6. **P1**: 添加 CORS 跨域配置
+7. **P1**: 新增 TrackingServiceImplTest 和 ExportServiceImplTest
+8. **P2**: 修复 ReportController 90 天时间范围校验
+9. **P2**: 移除 AlgorithmController 冗余 try-catch-rethrow
+10. **P2**: 移除 package.json 中未使用的 axios
 
 ---
 
-## Summary
+## VERDICT: REJECT
 
-| 统计项 | 数量 |
-|--------|:----:|
-| CRITICAL | 3 |
-| HIGH | 4 |
-| **Blocker 合计** | **7** |
-| WARNING | 7 |
-| INFO | 0 |
-
----
-
-**VERDICT: `REJECT`**
-
-核心原因：埋点、报表、导出三大模块均为 stub 实现（硬编码 Mock 数据），未与数据库集成，无法满足需求。同时存在 API 契约漂移、CORS 缺失、用户身份传递断裂等集成阻塞问题。
+**Summary**: 3 个 CRITICAL + 6 个 HIGH 阻塞项。核心问题：埋点/报表/导出三大模块均为 mock 实现，未建立真实数据通路，违反项目数据完整性关卡。前端缺少 X-User-Id 和 CORS 配置，跨仓契约未对齐。
