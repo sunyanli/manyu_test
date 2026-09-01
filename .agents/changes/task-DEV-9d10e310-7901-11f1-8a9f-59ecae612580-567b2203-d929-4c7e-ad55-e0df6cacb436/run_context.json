@@ -1,0 +1,9 @@
+{
+  "blocker_count": 0,
+  "task_id": "DEV-9d10e310-7901-11f1-8a9f-59ecae612580",
+  "review_status": "terminated",
+  "termination_reason": "Java guard triggered: no .java files found in change set. This skill is for Java code review only.",
+  "language": "Python",
+  "review_skill": "dtazziboot-java-code-review",
+  "timestamp": "2026-09-01"
+}
