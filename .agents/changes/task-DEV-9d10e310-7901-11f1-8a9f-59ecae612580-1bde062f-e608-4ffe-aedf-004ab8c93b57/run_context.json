@@ -2,7 +2,7 @@
   "task_id": "DEV-9d10e310-7901-11f1-8a9f-59ecae612580-1bde062f-e608-4ffe-aedf-004ab8c93b57",
   "stage": "review",
   "verdict": "REJECT",
-  "blocker_count": 9,
+  "blocker_count": 4,
   "review_date": "2026-09-01",
   "profile_state": "FOUND_AND_USED",
   "lane_verdicts": {
@@ -13,10 +13,10 @@
     "verify": "REJECT"
   },
   "findings_summary": {
-    "critical": 3,
-    "high": 6,
+    "critical": 1,
+    "high": 3,
     "warning": 3,
-    "info": 0
+    "info": 1
   },
   "repos": {
     "manyu_test": {
@@ -31,14 +31,9 @@
     }
   },
   "top_blockers": [
-    "TrackingServiceImpl.recordCall 仅打日志，未写入数据库",
-    "ReportController 返回硬编码 Mock 数据",
-    "ExportServiceImpl 返回硬编码 Mock 数据",
-    "ReportController/ExportController 绕过 GlobalExceptionHandler 自处理异常",
-    "前端未发送 X-User-Id Header",
-    "缺少 CORS 跨域配置",
-    "TrackingServiceImpl 缺少单元测试",
-    "ExportServiceImpl 缺少单元测试",
-    "ReportController.validateTimeRange 未校验90天限制"
+    "ApiCallLogMapper.dimensionStats SQL 注入漏洞 (${dimension})",
+    "TrackingServiceImpl.recordCall 维度字段硬编码为 unknown，报表功能无法使用",
+    "CallStatsRequest dimension/dimensionValue 筛选未生效",
+    "缺少 TrackingServiceImpl 和 ExportServiceImpl 单元测试"
   ]
 }

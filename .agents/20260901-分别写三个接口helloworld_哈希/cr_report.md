@@ -1,190 +1,158 @@
-# Code Review Report — 算法展示与监控子系统
+# 代码评审报告
 
-> **Review Target**: manyu_test (Java 后端) + manyu_test1 (React 前端)
-> **Requirement**: 三个接口 (helloworld/hash/bubble-sort) + 导出 + 埋点 + 可视化报表
-> **Review Date**: 2026-09-01
+> 评审日期：2026-09-01
+> 任务编号：DEV-9d10e310-7901-11f1-8a9f-59ecae612580-1bde062f-e608-4ffe-aedf-004ab8c93b57
+> 评审范围：manyu_test（28 文件）+ manyu_test1（4 文件）
+> 需求：算法展示与监控子系统（helloworld + 哈希算法 + 冒泡排序 + 前端展示 + 导出 + 埋点报表）
 
 ---
 
-## Project Profile
+## 项目评审画像
 
 **State**: FOUND_AND_USED
-**Source**: `REVIEW.md` (manyu_test root)
-**Notes**: 已存在的 REVIEW.md 包含跨仓契约、数据完整性、异常处理、测试四个关卡，与当前项目上下文匹配，直接使用。
+**Source**: `REVIEW.md` (manyu_test)
+**Notes**: 已有项目评审画像，覆盖跨仓契约、数据完整性、错误处理、测试四个门禁。实际评审中额外关注了 SQL 注入、数据流完整性等通用安全与正确性检查。
 
 ---
 
-## Lane Verdict Table
+## Lane 评审结论表
 
-| Lane | Verdict | Notes |
-|---|---|---|
-| Align | REJECT | 需求声明 vs 实际产出存在多处漂移（埋点未落库 / 报表为 mock 数据 / 导出为 mock 数据），前端未发送 X-User-Id 头，无 CORS 配置 |
-| Design | REJECT | ReportController 和 ExportController 在 Controller 层自行捕获异常返回 ApiResponse，绕过 GlobalExceptionHandler，设计不一致 |
-| Trim | APPROVE_WITH_COMMENTS | 代码整体精简，存在少量可优化项（冗余 try-catch-rethrow、axios 未使用） |
-| Cause | NOT_RUN | 本次为全新开发，非缺陷修复，无 root-cause 分析场景 |
-| Verify | REJECT | 埋点/导出/报表三大模块均为 mock 实现无真实数据通路；TrackingService 和 ExportService 缺少单元测试；ReportController 90 天限制未生效 |
+| Lane | Verdict | 说明 |
+|------|---------|------|
+| Align | REJECT | 埋点维度筛选声明与实现不一致（dimension/dimensionValue 已声明但未生效）；埋点记录维度字段总是写死 "unknown" |
+| Design | REJECT | 埋点记录将所有用户维度字段硬编码为 "unknown"，导致报表功能完全不可用；SQL 注入风险 |
+| Trim | APPROVE_WITH_COMMENTS | 代码结构清晰，模块划分合理，少量死代码 |
+| Cause | NOT_RUN | 本次为全新功能开发，非缺陷修复，无 root-cause closure 场景 |
+| Verify | REJECT | SQL 注入漏洞；埋点维度数据流断裂；缺少 TrackingService/ExportService 单元测试 |
 
 ---
 
-## Blocking Findings
+## 阻塞性发现 (Blocking)
 
-### [CRITICAL] [ALIGN] [DATA-INTEGRITY] TrackingServiceImpl.java:28-29 — 埋点仅写日志，未持久化到数据库
+### [CRITICAL] [VERIFY] [IMPLEMENTATION-BUG] src/main/java/com/example/demo/tracking/dao/mapper/ApiCallLogMapper.java:48-53 — SQL 注入漏洞
+
+**Evidence**: `dimensionStats` 方法使用 MyBatis `${dimension}`（字符串替换）而非 `#{dimension}`（参数化）：
+
+```java
+@Select("SELECT ${dimension} AS label, COUNT(*) AS count "
+        + "FROM api_call_log ...")
+```
+
+`dimension` 参数来自 HTTP 请求体 `DimensionStatsRequest.dimension`。虽然在 `ReportController` 中有白名单校验（`VALID_DIMENSIONS`），但 Mapper 层本身是开放的——任何绕过 Controller 的调用路径（如直接调用 Service、其他内部调用方）都会导致 SQL 注入。
+
+**Recommendation**: 将 `${dimension}` 改为 `#{dimension}`，并在 Mapper 内使用 CASE WHEN 或枚举映射，不在 SQL 字符串中拼接用户输入。
+
+---
+
+### [HIGH] [DESIGN] [BOUNDARY-LEAK] src/main/java/com/example/demo/tracking/service/impl/TrackingServiceImpl.java:49-51 — 埋点维度字段始终写死为 "unknown"
 
 **Evidence**:
-- `TrackingServiceImpl.recordCall()` 仅调用 `logger.info(...)` 记录日志，未注入任何 Mapper/Repository 执行数据库 INSERT
-- `schema.sql` 已定义 `api_call_log` 表 (含 api_name, user_id, user_type, user_level, user_department 等字段)
-- `pom.xml` 已引入 MyBatis-Plus 依赖，但未使用
-- 注释标注 "同步记录到数据库"，与实现矛盾
+```java
+log.setUserType("unknown");
+log.setUserLevel("unknown");
+log.setUserDepartment("unknown");
+```
 
-**Recommendation**: 注入 MyBatis-Plus Mapper，在 `recordCall()` 中构造 `ApiCallLog` 实体 INSERT 到 `api_call_log` 表。同时需查询 `user_info` 表获取用户维度信息 (user_type/user_level/user_department)，或使用默认值 "unknown"。
+`recordCall()` 方法将所有用户维度字段硬编码为 `"unknown"`。这意味着：
+- W05 调用统计按维度筛选时，所有维度值均为 `"unknown"`
+- W06 维度统计（饼图/柱状图）的 `GROUP BY user_type/user_level/user_department` 只会返回一条 `"unknown"` 分组
+- 前端报表功能的全部维度筛选、饼图、柱状图均无法展示有意义的分类数据，功能完全失效
 
----
-
-### [CRITICAL] [ALIGN] [DATA-INTEGRITY] ReportController.java:51-56, 85-88 — 报表接口返回硬编码 mock 数据
-
-**Evidence**:
-- `callStats()` 方法 (line 51-56) 直接构造固定时序数据 `[("2026-09-01", 15), ("2026-09-02", 23), ("2026-09-03", 18)]`，未查询 `api_call_log` 表
-- `dimensionStats()` 方法 (line 85-88) 直接构造固定维度数据 `["技术部", "产品部", "运营部"]`，未查询数据库
-- 注释标注 "实际应查询数据库"，但交付时未实现
-- 违反 REVIEW.md 关卡：Report queries must read from database, not mock data
-
-**Recommendation**: 在 TrackingService 中新增 `queryCallStats()` 和 `queryDimensionStats()` 方法，根据时间范围和维度参数从 `api_call_log` 表 (JOIN `user_info` 表) 执行 GROUP BY 聚合查询。
+**Recommendation**: 从请求上下文或 `user_info` 表查询当前用户的真实维度信息（user_type/user_level/user_department），或通过 `X-User-Id` header 关联 `user_info` 表获取。
 
 ---
 
-### [CRITICAL] [ALIGN] [DATA-INTEGRITY] ExportServiceImpl.java:65-71 — 导出接口返回硬编码示例数据
+### [HIGH] [ALIGN] [CLAIM-DRIFT] src/main/java/com/example/demo/tracking/controller/ReportController.java:52-62 + src/main/java/com/example/demo/tracking/service/impl/TrackingServiceImpl.java:60-77 — CallStatsRequest 的 dimension 筛选未生效
 
-**Evidence**:
-- `exportData()` 方法 (line 65-71) 仅写入一行 `sample_user` 的固定数据，未查询数据库
-- 注释标注 "实际场景应查询数据库"，但交付时未实现
-- 违反 REVIEW.md 关卡：Export must read from database, not mock data
+**Evidence**: `ReportController.callStats()` 接收并校验了 `CallStatsRequest.dimension` 和 `dimensionValue`，但调用 `trackingService.queryCallStats(request)` 时，`TrackingServiceImpl.queryCallStats()` 完全忽略了这两个字段，始终以 `null` 作为 `apiName` 传给 `callStatsByDay`：
 
-**Recommendation**: 根据 `exportType` 查询 `api_call_log` 表中对应 `api_name` 的记录，按时间范围筛选后写入 Excel。
+```java
+// TrackingServiceImpl:64
+List<Map<String, Object>> rows = apiCallLogMapper.callStatsByDay(
+        null, startTime, endTime);
+```
 
----
+设计文档中 `CallStatsRequest` 明确声明了 `dimension`（筛选维度）和 `dimensionValue`（维度值），但 SQL 查询 `callStatsByDay` 不支持按维度筛选，只支持按 `apiName` 筛选。这导致前端传了维度筛选也得不到过滤结果。
 
-### [HIGH] [DESIGN] [BOUNDARY-LEAK] ReportController.java:62-68, 96-102 / ExportController.java:57-64 — Controller 层自行捕获异常并构造响应，绕过 GlobalExceptionHandler
-
-**Evidence**:
-- `ReportController`: `catch (BusinessException e)` 直接返回 `ApiResponse.error(...)`；`catch (Exception e)` 返回硬编码 `"B0001"`
-- `ExportController`: 同样在 Controller 层 catch 并 return `ResponseEntity.ok(ApiResponse.error(...))`
-- `AlgorithmController` 则依赖 `GlobalExceptionHandler` 统一处理异常
-- 同一项目内两种异常处理策略并存，维护者需同时理解两套路径
-
-**Recommendation**: 统一使用 `GlobalExceptionHandler` 处理所有异常。Controller 层不应有 try-catch 包裹业务逻辑。如需特殊处理，应在 Service 层抛出 BusinessException，由 GlobalExceptionHandler 统一拦截。
+**Recommendation**: 在 `callStatsByDay` SQL 中增加按维度筛选的条件，或根据 `dimension`/`dimensionValue` 动态拼接 WHERE 条件（使用参数化查询）。
 
 ---
 
-### [HIGH] [ALIGN] [API-CONTRACT] AlgorithmDashboard.js — 前端未发送 X-User-Id 请求头
+### [HIGH] [VERIFY] [TEST-GAP] — 缺少 TrackingService 和 ExportService 的单元测试
 
-**Evidence**:
-- `AlgorithmController.getUserId()` 从 `HttpServletRequest.getHeader("X-User-Id")` 读取用户 ID
-- 前端 `AlgorithmDashboard.js` 中所有 fetch 请求仅设置 `Content-Type: application/json`，未设置 `X-User-Id` 头
-- REVIEW.md 要求：User identity header (X-User-Id) contract must be honored by both sides
-- 结果：所有埋点记录的 `user_id` 将始终为 `"anonymous"`
+**Evidence**: 项目 `REVIEW.md` 要求 "Unit tests required for all Service implementations"。当前仅有 `AlgorithmServiceImplTest.java`（12 个测试），缺少：
+- `TrackingServiceImplTest` — 覆盖 `recordCall`、`queryCallStats`、`queryDimensionStats`
+- `ExportServiceImplTest` — 覆盖 `exportData` 的正常/异常/边界路径
 
-**Recommendation**: 前端在所有 fetch 请求中添加 `X-User-Id` header（从 SSO 或登录态获取），或在请求拦截器中统一注入。
+**Recommendation**: 为 `TrackingServiceImpl` 和 `ExportServiceImpl` 补充单元测试，至少覆盖正常路径、异常路径（开关关闭、参数非法）和边界条件（空数据导出）。
 
 ---
 
-### [HIGH] [ALIGN] [CONFIG-CONTRACT] application.yml — 无 CORS 跨域配置
+## 建议性发现 (Advisory)
 
-**Evidence**:
-- 前端部署在 `localhost:3000` (React)，后端在 `localhost:8080` (Spring Boot) — 不同源
-- `application.yml` 中无任何 CORS 配置
-- REVIEW.md 要求：CORS must be configured for cross-origin frontend requests
+### [WARNING] [DESIGN] [OBSERVABILITY-GAP] src/main/java/com/example/demo/tracking/service/impl/TrackingServiceImpl.java:39-57 — 埋点记录为同步阻塞，不符合设计约定
 
-**Recommendation**: 添加 CORS 配置（WebMvcConfigurer.addCorsMappings 或 `@CrossOrigin` 注解），允许前端域名的跨域请求。
+**Evidence**: 设计文档 R08 规定 "埋点失败不影响主流程，异步记录日志告警"。当前实现为同步 `insert`（虽然 try-catch 防止了异常传播），但会阻塞主请求线程直到数据库写入完成。
 
----
-
-### [HIGH] [VERIFY] [TEST-GAP] TrackingServiceImpl.java — 缺少单元测试
-
-**Evidence**:
-- REVIEW.md 关卡：Unit tests required for all Service implementations
-- `AlgorithmServiceImpl` 有 12 个测试用例，但 `TrackingServiceImpl` 和 `ExportServiceImpl` 均无测试文件
-- 无法验证埋点记录逻辑的正确性
-
-**Recommendation**: 新增 `TrackingServiceImplTest`，覆盖：正常记录、tracking.enabled=false 跳过、异常时不影响主流程。
+**Recommendation**: 使用 `@Async` + `@EnableAsync` 或线程池异步执行埋点写入，避免数据库延迟影响业务接口响应时间。
 
 ---
 
-### [HIGH] [VERIFY] [TEST-GAP] ExportServiceImpl.java — 缺少单元测试
+### [WARNING] [TRIM] [DEAD-CODE] src/main/java/com/example/demo/tracking/model/request/CallStatsRequest.java:24-27 — dimensionValue 字段从未被使用
 
-**Evidence**:
-- 同上，`ExportServiceImpl` 无任何测试覆盖
+**Evidence**: `CallStatsRequest.dimensionValue` 字段在 Controller 中校验了 `dimension` 合法性，但 `dimensionValue` 完全未被任何代码消费。SQL 查询 `callStatsByDay` 不支持按维度值过滤。
 
-**Recommendation**: 新增 `ExportServiceImplTest`，覆盖：合法导出类型、非法导出类型抛异常、导出功能禁用、max-records 限制。
-
----
-
-### [HIGH] [VERIFY] [BOUNDARY-CASE] ReportController.java:108-117 — validateTimeRange 未校验 90 天上限
-
-**Evidence**:
-- `validateTimeRange()` 仅校验 null 和 startTime > endTime
-- 错误码 `TRK_001` 描述为 "时间范围不能超过90天"，但代码中未执行该比较
-- 若传入 365 天范围，方法不会拒绝
-
-**Recommendation**: 在 `validateTimeRange()` 中解析日期字符串并计算差值，超过 90 天时抛出 `TRK_001`。
+**Recommendation**: 要么实现 dimensionValue 过滤逻辑，要么从 `CallStatsRequest` 中移除该字段直到真正需要时再添加。
 
 ---
 
-## Advisory Findings
+### [WARNING] [VERIFY] [ERROR-PATH] src/main/java/com/example/demo/export/controller/ExportController.java:40-51 + src/main/java/com/example/demo/export/service/impl/ExportServiceImpl.java:51-103 — 导出异常时返回 JSON 而非二进制流
 
-### [WARNING] [TRIM] [LOGIC-SIMPLIFICATION] AlgorithmController.java:43-50, 58-65, 73-80 — 冗余 try-catch-rethrow
+**Evidence**: 当 `ExportServiceImpl` 抛出 `BusinessException`（如 EXP_001 导出类型非法），`GlobalExceptionHandler` 会返回 `ApiResponse` JSON 而非二进制 Excel 流。前端 `handleExport` 检查 `res.ok` 并尝试将响应解析为 blob，但在 HTTP 200 + JSON 响应体的情况下，用户会下载到一个包含 JSON 错误信息的 .xlsx 文件，而非得到有意义的错误提示。
 
-**Evidence**:
-- 三个接口方法中 `catch (Exception e) { logger.error(...); throw e; }` 仅记录日志后重新抛出
-- GlobalExceptionHandler 已全局捕获所有异常并记录日志
-- 该模式增加噪音，不提供额外价值
-
-**Recommendation**: 移除 try-catch 块，让异常自然传播到 GlobalExceptionHandler。
+**Recommendation**: 在 `ExportController` 中捕获 `BusinessException` 并返回适当的 HTTP 错误状态码（如 400），或在前端先检查 `Content-Type` 再决定处理方式。
 
 ---
 
-### [WARNING] [TRIM] [UNUSED-ABSTRACTION] package.json — axios 依赖已声明但未使用
+### [INFO] [TRIM] [PUBLIC-SURFACE] — ApiCallLog 实体包含 userName 字段但从未被赋值
 
-**Evidence**:
-- `package.json` 声明 `"axios": "^1.6.0"`
-- 前端代码全部使用原生 `fetch` API，未 import axios
+**Evidence**: `ApiCallLog` 实体定义了 `userName` 字段，`recordCall()` 方法中从未设置 `userName`。`selectForExport` 查询了 `user_name` 列，但写入时总是为空。
 
-**Recommendation**: 移除 axios 依赖，或统一使用 axios 替代原生 fetch 以获得更好的错误处理。
+**Recommendation**: 在 `recordCall()` 中从用户上下文获取并设置 `userName`，或如果短期内不需要则移除该字段以减少维护负担。
 
 ---
 
-### [WARNING] [VERIFY] [TEST-GAP] AlgorithmServiceImplTest — 缺少 request == null 的测试用例
+## 跳过的 Lane
 
-**Evidence**:
-- `computeHash()` 方法第一行检查 `request == null`，但测试中仅测试 `request.input == null` 场景
-- 缺少传入 `null` 作为 request 参数的测试
-
-**Recommendation**: 新增 `shouldThrowException_whenRequestNull` 测试。
+| Lane | 原因 |
+|------|------|
+| Cause | 本次为全新功能开发，非缺陷修复。无 root-cause closure 场景可评审。 |
 
 ---
 
-## Skipped Lanes and Reasons
+## 建议后续行动
 
-| Lane | Reason |
-|------|--------|
-| Cause | 本次为全新功能开发，非缺陷修复，无 root-cause 分析场景 |
-
----
-
-## Suggested Next Actions
-
-1. **P0**: 实现 TrackingServiceImpl 的数据库持久化（注入 Mapper，INSERT api_call_log）
-2. **P0**: 实现 ReportController 的数据库查询（聚合 api_call_log + user_info）
-3. **P0**: 实现 ExportServiceImpl 的数据库查询
-4. **P1**: 统一异常处理策略 — 移除 Controller 层 try-catch，统一走 GlobalExceptionHandler
-5. **P1**: 前端添加 X-User-Id 请求头
-6. **P1**: 添加 CORS 跨域配置
-7. **P1**: 新增 TrackingServiceImplTest 和 ExportServiceImplTest
-8. **P2**: 修复 ReportController 90 天时间范围校验
-9. **P2**: 移除 AlgorithmController 冗余 try-catch-rethrow
-10. **P2**: 移除 package.json 中未使用的 axios
+1. **立即修复** SQL 注入漏洞（ApiCallLogMapper.dimensionStats 的 `${dimension}`）
+2. **修复** 埋点维度字段从硬编码 "unknown" 改为从用户上下文获取真实值
+3. **实现** CallStatsRequest 的 dimension/dimensionValue 筛选逻辑
+4. **补充** TrackingServiceImpl 和 ExportServiceImpl 的单元测试
+5. **考虑** 将埋点写入改为异步执行
+6. **考虑** 修复导出异常时的错误响应格式问题
 
 ---
 
-## VERDICT: REJECT
+## 跨仓对齐点检查
 
-**Summary**: 3 个 CRITICAL + 6 个 HIGH 阻塞项。核心问题：埋点/报表/导出三大模块均为 mock 实现，未建立真实数据通路，违反项目数据完整性关卡。前端缺少 X-User-Id 和 CORS 配置，跨仓契约未对齐。
+| 对齐项 | 状态 | 说明 |
+|--------|------|------|
+| API 路径 (frontend ↔ backend) | ✅ | 前端 `API_BASE + /api/algorithm/*` 与后端 `@RequestMapping` 一致 |
+| X-User-Id Header | ✅ | 前端 `apiFetch` 发送 `X-User-Id`，后端 `getUserId()` 读取 |
+| CORS 配置 | ✅ | `CorsConfig` 已配置 `/api/**` 允许跨域 |
+| 导出格式 | ✅ | 后端返回 `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`，前端以 blob 下载 |
+| 报表数据格式 | ✅ | `CallStatsVO.series[{time, count}]` 与前端折线图 `s.time/s.count` 对齐；`DimensionStatsVO.items[{label, count, percentage}]` 与前端饼图/柱状图对齐 |
+
+---
+
+**VERDICT: REJECT**
+
+> 评审结论：存在 1 个 CRITICAL（SQL 注入）和 3 个 HIGH（埋点维度数据断裂、维度筛选未生效、缺少单元测试），必须修复后方可合入。
