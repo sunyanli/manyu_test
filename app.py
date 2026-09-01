@@ -5,7 +5,6 @@ from hash_algo import compute_hash
 from sort_api import sort_data
 from tracking import track_call, get_overview, get_chart_data, get_tab_data, get_all_records
 from export import export_to_csv
-from weather import get_weather_forecast, get_weather_trend
 
 app = Flask(__name__)
 CORS(app)
@@ -118,27 +117,6 @@ def api_export():
         mimetype="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
-
-
-# ==================== 天气接口 ====================
-
-@app.route('/api/weather', methods=['GET'])
-def api_weather():
-    city = request.args.get('city', '杭州')
-    days = int(request.args.get('days', 7))
-    result = get_weather_forecast(city, days)
-    if "error" in result:
-        return error("WEATHER_001", result["error"])
-    return success(result)
-
-
-@app.route('/api/weather/trend', methods=['GET'])
-def api_weather_trend():
-    city = request.args.get('city', '杭州')
-    result = get_weather_trend(city)
-    if "error" in result:
-        return error("WEATHER_002", result["error"])
-    return success(result)
 
 
 if __name__ == '__main__':

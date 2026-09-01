@@ -15,7 +15,7 @@ def track_call(api_name: str, caller: str = "anonymous",
     _api_call_count += 1
     record = {
         "id": str(uuid.uuid4()),
-        "timestamp": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "api": api_name,
         "caller": caller,
         "user_type": user_type,

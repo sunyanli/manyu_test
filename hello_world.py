@@ -5,5 +5,5 @@ def hello_world():
     """HelloWorld 接口逻辑"""
     return {
         "message": "Hello World!",
-        "timestamp": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     }
