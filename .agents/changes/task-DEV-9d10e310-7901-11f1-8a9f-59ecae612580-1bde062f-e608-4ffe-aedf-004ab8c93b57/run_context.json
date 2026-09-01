@@ -1,1 +1,42 @@
-{"blocker_count": 7}
+{
+  "task_id": "DEV-9d10e310-7901-11f1-8a9f-59ecae612580-1bde062f-e608-4ffe-aedf-004ab8c93b57",
+  "stage": "review",
+  "verdict": "REJECT",
+  "blocker_count": 7,
+  "review_date": "2026-09-01",
+  "profile_state": "FOUND_AND_USED",
+  "lane_verdicts": {
+    "align": "REJECT",
+    "design": "REJECT",
+    "trim": "APPROVE_WITH_COMMENTS",
+    "cause": "NOT_RUN",
+    "verify": "REJECT"
+  },
+  "findings_summary": {
+    "critical": 3,
+    "high": 4,
+    "warning": 7,
+    "info": 0
+  },
+  "repos": {
+    "manyu_test": {
+      "branch": "AI/task-DEV-9d10e310-7901-11f1-8a9f-59ecae612580-1bde062f-e608-4ffe-aedf-004ab8c93b57",
+      "base": "cred-test-20260716022903",
+      "files_changed": 28
+    },
+    "manyu_test1": {
+      "branch": "AI/task-DEV-9d10e310-7901-11f1-8a9f-59ecae612580-1bde062f-e608-4ffe-aedf-004ab8c93b57",
+      "base": "main",
+      "files_changed": 4
+    }
+  },
+  "top_blockers": [
+    "TrackingServiceImpl.recordCall 仅打日志，未写入数据库",
+    "ReportController 返回硬编码 Mock 数据",
+    "ExportServiceImpl 返回硬编码 Mock 数据",
+    "缺少 CORS 跨域配置",
+    "前端未发送 X-User-Id Header",
+    "缺少数据持久层 Entity/Mapper",
+    "BubbleSortVO durationMs 字段命名不一致"
+  ]
+}

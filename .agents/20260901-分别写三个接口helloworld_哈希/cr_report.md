@@ -11,9 +11,9 @@
 
 | 项目 | 内容 |
 |------|------|
-| State | `CREATED_AND_USED` |
-| Source | `REVIEW.md` (新建) |
-| Notes | 项目无既有 REVIEW.md，基于 pom.xml、design.md 及代码结构新建 |
+| State | `FOUND_AND_USED` |
+| Source | `REVIEW.md` (root) |
+| Notes | 项目级评审门禁已覆盖跨仓契约、数据完整性、异常处理、测试四个维度，与当前变更匹配 |
 
 ---
 
