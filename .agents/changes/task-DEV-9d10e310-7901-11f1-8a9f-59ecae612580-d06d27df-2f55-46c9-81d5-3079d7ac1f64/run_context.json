@@ -24,6 +24,7 @@
     ],
     "next_steps": "进入实施计划阶段，按 plan.md 的 Task 1~8 逐步实现"
   },
+  "blocker_count": 2,
   "outputs": [
     ".agents/20260901-分别写三个接口helloworld_哈希/dima.md"
   ]
