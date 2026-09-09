@@ -12,9 +12,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /**
  * 待办事项业务服务实现
@@ -78,8 +78,8 @@ public class TodoServiceImpl implements TodoService {
         todoItem.setStatus(TodoStatusEnum.INIT.getCode());
         todoItem.setCreator(getCurrentCreator());
         todoItem.setIsDeleted(0);
-        todoItem.setGmtCreate(LocalDateTime.now());
-        todoItem.setGmtModified(LocalDateTime.now());
+        todoItem.setGmtCreate(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
+        todoItem.setGmtModified(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
         return todoItem;
     }
 

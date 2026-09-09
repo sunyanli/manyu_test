@@ -1,5 +1,6 @@
 package com.alipay.todo.controller;
 
+import com.alipay.todo.common.constant.SecurityContextHolder;
 import com.alipay.todo.common.exception.TodoException;
 import com.alipay.todo.model.dto.TodoCreateRequest;
 import com.alipay.todo.model.dto.TodoItemDTO;
@@ -63,7 +64,7 @@ public class TodoController {
             response.put("data", data);
             return ResponseEntity.ok(response);
         } catch (TodoException e) {
-            logger.error("create todo error, errorCode: {}, message: {}", e.getErrorCode(), e.getMessage());
+            logger.error("create todo error, errorCode: {}, message: {}", e.getErrorCode(), e.getMessage(), e);
             Map<String, Object> response = new HashMap<>();
             response.put("code", e.getErrorCode());
             response.put("msg", e.getMessage());
@@ -76,6 +77,8 @@ public class TodoController {
             response.put("msg", "系统异常，请稍后重试");
             response.put("data", null);
             return ResponseEntity.internalServerError().body(response);
+        } finally {
+            SecurityContextHolder.clear();
         }
     }
 }
