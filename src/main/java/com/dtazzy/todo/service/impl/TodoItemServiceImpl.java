@@ -28,6 +28,7 @@ public class TodoItemServiceImpl implements TodoItemService {
 
     @Override
     public TodoItemDO createTodoItem(String tenantId, CreateTodoItemRequest request) {
+        validateTenantId(tenantId);
         validateName(request.getName());
         validateDescription(request.getDescription());
 
@@ -43,6 +44,12 @@ public class TodoItemServiceImpl implements TodoItemService {
         } catch (Exception e) {
             logger.error("待办事项创建失败, tenantId: {}, name: {}", tenantId, request.getName(), e);
             throw new BusinessException("TODO_004", "系统繁忙，请稍后重试", e);
+        }
+    }
+
+    private void validateTenantId(String tenantId) {
+        if (tenantId == null || tenantId.isBlank()) {
+            throw new BusinessException("TODO_005", "租户标识不能为空");
         }
     }
 

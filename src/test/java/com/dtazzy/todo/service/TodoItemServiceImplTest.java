@@ -71,7 +71,8 @@ class TodoItemServiceImplTest {
 
         assertThatThrownBy(() -> todoItemService.createTodoItem(TEST_TENANT_ID, validRequest))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("TODO_001");
+                .extracting("errorCode")
+                .isEqualTo("TODO_001");
 
         verify(todoItemMapper, never()).insert(any());
     }
@@ -86,7 +87,8 @@ class TodoItemServiceImplTest {
 
         assertThatThrownBy(() -> todoItemService.createTodoItem(TEST_TENANT_ID, validRequest))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("TODO_001");
+                .extracting("errorCode")
+                .isEqualTo("TODO_001");
 
         verify(todoItemMapper, never()).insert(any());
     }
@@ -101,7 +103,8 @@ class TodoItemServiceImplTest {
 
         assertThatThrownBy(() -> todoItemService.createTodoItem(TEST_TENANT_ID, validRequest))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("TODO_001");
+                .extracting("errorCode")
+                .isEqualTo("TODO_001");
 
         verify(todoItemMapper, never()).insert(any());
     }
@@ -116,7 +119,8 @@ class TodoItemServiceImplTest {
 
         assertThatThrownBy(() -> todoItemService.createTodoItem(TEST_TENANT_ID, validRequest))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("TODO_002");
+                .extracting("errorCode")
+                .isEqualTo("TODO_002");
 
         verify(todoItemMapper, never()).insert(any());
     }
@@ -147,7 +151,8 @@ class TodoItemServiceImplTest {
 
         assertThatThrownBy(() -> todoItemService.createTodoItem(TEST_TENANT_ID, validRequest))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("TODO_003");
+                .extracting("errorCode")
+                .isEqualTo("TODO_003");
 
         verify(todoItemMapper, never()).insert(any());
     }
@@ -195,6 +200,7 @@ class TodoItemServiceImplTest {
 
         assertThatThrownBy(() -> todoItemService.createTodoItem(TEST_TENANT_ID, validRequest))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("TODO_004");
+                .extracting("errorCode")
+                .isEqualTo("TODO_004");
     }
 }
