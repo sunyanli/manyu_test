@@ -21,11 +21,4 @@
         VALUES (#{title}, #{description}, #{userId}, #{gmtCreate}, #{gmtModified})
     </insert>
 
-    <select id="selectById" resultMap="TodoItemResultMap">
-        SELECT
-        <include refid="Base_Column_List"/>
-        FROM todo_item
-        WHERE id = #{id}
-    </select>
-
 </mapper>

@@ -54,7 +54,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public Result<Void> handleException(Exception e) {
-        logger.error("系统异常", e);
+        logger.error("系统异常: {}", e.getMessage(), e);
         return Result.fail("TODO_004", "系统异常，请稍后重试");
     }
 }

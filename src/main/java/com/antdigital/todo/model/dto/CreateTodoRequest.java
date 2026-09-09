@@ -36,6 +36,11 @@ public class CreateTodoRequest implements Serializable {
     @Size(max = DESCRIPTION_MAX_LENGTH, message = "事项描述长度不能超过2000字符")
     private String description;
 
+    /**
+     * 创建用户ID
+     */
+    private Long userId;
+
     public String getTitle() {
         return title;
     }
@@ -50,5 +55,13 @@ public class CreateTodoRequest implements Serializable {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 }

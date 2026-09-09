@@ -43,9 +43,10 @@ public class TodoController {
      */
     @PostMapping("/create")
     public Result<TodoVO> createTodo(@Valid @RequestBody CreateTodoRequest request) {
-        logger.info("收到创建待办事项请求: title={}", request.getTitle());
-        TodoVO todoVO = todoService.createTodo(request, 1L);
-        logger.info("创建待办事项成功: todoId={}", todoVO.getTodoId());
+        Long userId = request.getUserId();
+        logger.info("收到创建待办事项请求: title={}, userId={}", request.getTitle(), userId);
+        TodoVO todoVO = todoService.createTodo(request, userId);
+        logger.info("创建待办事项成功: todoId={}, userId={}", todoVO.getTodoId(), userId);
         return Result.success("创建成功", todoVO);
     }
 }

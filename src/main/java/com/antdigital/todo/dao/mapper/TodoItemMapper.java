@@ -2,7 +2,6 @@ package com.antdigital.todo.dao.mapper;
 
 import com.antdigital.todo.model.entity.TodoItemDO;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 
 /**
  * 待办事项Mapper接口
@@ -21,11 +20,4 @@ public interface TodoItemMapper {
      */
     int insert(TodoItemDO todoItem);
 
-    /**
-     * 根据主键查询待办事项
-     *
-     * @param id 主键ID
-     * @return 待办事项数据对象
-     */
-    TodoItemDO selectById(@Param("id") Long id);
 }

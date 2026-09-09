@@ -1,7 +1,5 @@
 package com.antdigital.todo.model.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.io.Serializable;
 
 /**
@@ -15,7 +13,6 @@ public class TodoVO implements Serializable {
     /**
      * 待办事项ID
      */
-    @JsonProperty("todo_id")
     private Long todoId;
 
     public TodoVO() {

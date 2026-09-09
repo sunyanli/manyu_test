@@ -17,6 +17,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import org.mockito.ArgumentCaptor;
+
 /**
  * TodoServiceImpl 单元测试
  *
@@ -48,7 +50,6 @@ class TodoServiceImplTest {
         savedItem.setId(1L);
         savedItem.setTitle("完成日报");
         when(todoItemMapper.insert(any(TodoItemDO.class))).thenReturn(1);
-        when(todoItemMapper.selectById(1L)).thenReturn(savedItem);
 
         // Act
         TodoVO result = todoService.createTodo(validRequest, 1L);
@@ -133,7 +134,6 @@ class TodoServiceImplTest {
     @Test
     void should_setGmtCreateAndGmtModified_onInsert() {
         // Arrange
-        TodoItemDO capturedItem = new TodoItemDO();
         when(todoItemMapper.insert(any(TodoItemDO.class))).thenAnswer(invocation -> {
             TodoItemDO item = invocation.getArgument(0);
             item.setId(3L);
@@ -146,5 +146,10 @@ class TodoServiceImplTest {
         // Assert
         assertNotNull(result);
         assertEquals(3L, result.getTodoId());
+        ArgumentCaptor<TodoItemDO> captor = ArgumentCaptor.forClass(TodoItemDO.class);
+        verify(todoItemMapper, times(1)).insert(captor.capture());
+        TodoItemDO captured = captor.getValue();
+        assertNotNull(captured.getGmtCreate());
+        assertNotNull(captured.getGmtModified());
     }
 }
