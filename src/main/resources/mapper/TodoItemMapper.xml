@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.alipay.todo.dao.mapper.TodoItemMapper">
+
+    <resultMap id="TodoItemResultMap" type="com.alipay.todo.model.entity.TodoItemDO">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="tenant_id" property="tenantId" jdbcType="VARCHAR"/>
+        <result column="name" property="name" jdbcType="VARCHAR"/>
+        <result column="description" property="description" jdbcType="VARCHAR"/>
+        <result column="status" property="status" jdbcType="VARCHAR"/>
+        <result column="creator" property="creator" jdbcType="VARCHAR"/>
+        <result column="is_deleted" property="isDeleted" jdbcType="TINYINT"/>
+        <result column="gmt_create" property="gmtCreate" jdbcType="TIMESTAMP"/>
+        <result column="gmt_modified" property="gmtModified" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.alipay.todo.model.entity.TodoItemDO"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO todo_item (tenant_id, name, description, status, creator, is_deleted, gmt_create, gmt_modified)
+        VALUES (#{tenantId}, #{name}, #{description}, #{status}, #{creator}, #{isDeleted}, #{gmtCreate}, #{gmtModified})
+    </insert>
+
+    <select id="selectById" resultMap="TodoItemResultMap">
+        SELECT id, tenant_id, name, description, status, creator, is_deleted, gmt_create, gmt_modified
+        FROM todo_item
+        WHERE id = #{id} AND is_deleted = 0
+    </select>
+
+</mapper>
