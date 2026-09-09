@@ -86,7 +86,7 @@
 |----|--------|------|
 | A3.1 | K&R 大括号 | ✅ 符合 |
 | A3.3 | 缩进 4 空格 | ✅ 符合 |
-| A3.4 | 行宽 ≤ 120 字符 | ⚠️ 3 处超限 |
+| A3.4 | 行宽 ≤ 120 字符 | ✅ 已修复（3 处超限全部修复） |
 | A3.7 | 关键字与 `(` 之间加空格 | ✅ 符合 |
 
 **A3.4 违规明细**：
@@ -365,13 +365,13 @@
 
 ## §8 修复任务列表
 
-- [ ] **P1** `TodoServiceImpl.java:72-73` — `LocalDateTime.now()` 改为 `LocalDateTime.now(ZoneId.of("UTC+8"))` 或显式指定时区（M016）
+- [x] **P1** `TodoServiceImpl.java:72-73` — `LocalDateTime.now()` 改为 `LocalDateTime.now(TodoConstants.DEFAULT_ZONE_ID)`，显式指定 Asia/Shanghai 时区（M016）✅ 已修复
 - [ ] **P1** `TodoServiceImpl.java` — 考虑添加接口入口埋点，记录调用次数、处理耗时、处理结果（G16.1）
 - [ ] **P1** `TodoServiceImpl.java` — 考虑添加功能开关，控制新增功能的可用性（G17.1）
 - [ ] **P1** `TodoServiceImpl.java` — 考虑为写接口添加幂等键（G2.1）
-- [ ] **P2** `GlobalExceptionHandler.java:55` — 行宽超 120 字符，建议拆分三元表达式
-- [ ] **P2** `TodoServiceImplTest.java:133,147,167` — 行宽超 120 字符，建议拆分断言语句
-- [ ] **P2** `TodoServiceImplTest.java` — 补充边界值测试：title 恰好 128 字符、description 恰好 1024 字符（G11.2）
+- [x] **P2** `GlobalExceptionHandler.java:55` — 行宽超 120 字符，已拆分三元表达式为 if-else（A3.4）✅ 已修复
+- [x] **P2** `TodoServiceImplTest.java:133,147,167` — 行宽超 120 字符，已提取断言辅助方法（A3.4）✅ 已修复
+- [x] **P2** `TodoServiceImplTest.java` — 补充边界值测试：title 恰好 128 字符、description 恰好 1024 字符、空 description（G11.2）✅ 已修复
 
 ---
 

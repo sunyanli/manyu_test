@@ -69,8 +69,9 @@ public class TodoServiceImpl implements TodoService {
         todoItem.setDescription(request.getDescription());
         todoItem.setCreatorId(creatorId);
         todoItem.setTenantId(tenantId);
-        todoItem.setGmtCreate(LocalDateTime.now());
-        todoItem.setGmtModified(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now(TodoConstants.DEFAULT_ZONE_ID);
+        todoItem.setGmtCreate(now);
+        todoItem.setGmtModified(now);
 
         // 持久化
         int rows = todoItemMapper.insert(todoItem);

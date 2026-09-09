@@ -1,5 +1,7 @@
 package com.dtazziboot.todoapp.common.constant;
 
+import java.time.ZoneId;
+
 /**
  * 待办事项模块常量
  *
@@ -7,6 +9,11 @@ package com.dtazziboot.todoapp.common.constant;
  * @date 2026/09/09
  */
 public final class TodoConstants {
+
+    /**
+     * 业务默认时区（东八区）
+     */
+    public static final ZoneId DEFAULT_ZONE_ID = ZoneId.of("Asia/Shanghai");
 
     /**
      * 模块错误码前缀

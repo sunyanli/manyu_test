@@ -1,5 +1,6 @@
 package com.dtazziboot.todoapp.service.impl;
 
+import com.dtazziboot.todoapp.common.constant.TodoConstants;
 import com.dtazziboot.todoapp.common.context.LoginContext;
 import com.dtazziboot.todoapp.common.enums.ErrorCodeEnum;
 import com.dtazziboot.todoapp.common.exception.BusinessException;
@@ -130,7 +131,7 @@ class TodoServiceImplTest {
             // when / then
             assertThatThrownBy(() -> todoService.createTodo(request))
                     .isInstanceOf(BusinessException.class)
-                    .satisfies(e -> assertThat(((BusinessException) e).getErrorCode()).isEqualTo(ErrorCodeEnum.TODO_004));
+                    .satisfies(this::assertTodo004ErrorCode);
         }
 
         @Test
@@ -144,7 +145,12 @@ class TodoServiceImplTest {
             // when / then
             assertThatThrownBy(() -> todoService.createTodo(request))
                     .isInstanceOf(BusinessException.class)
-                    .satisfies(e -> assertThat(((BusinessException) e).getErrorCode()).isEqualTo(ErrorCodeEnum.TODO_004));
+                    .satisfies(this::assertTodo004ErrorCode);
+        }
+
+        private void assertTodo004ErrorCode(Throwable e) {
+            ErrorCodeEnum actual = ((BusinessException) e).getErrorCode();
+            assertThat(actual).isEqualTo(ErrorCodeEnum.TODO_004);
         }
     }
 
@@ -164,7 +170,76 @@ class TodoServiceImplTest {
             // when / then
             assertThatThrownBy(() -> todoService.createTodo(request))
                     .isInstanceOf(BusinessException.class)
-                    .satisfies(e -> assertThat(((BusinessException) e).getErrorCode()).isEqualTo(ErrorCodeEnum.TODO_005));
+                    .satisfies(this::assertTodo005ErrorCode);
+        }
+
+        private void assertTodo005ErrorCode(Throwable e) {
+            ErrorCodeEnum actual = ((BusinessException) e).getErrorCode();
+            assertThat(actual).isEqualTo(ErrorCodeEnum.TODO_005);
+        }
+    }
+
+    @Nested
+    @DisplayName("边界值测试")
+    class BoundaryValue {
+
+        @Test
+        @DisplayName("should_createTodo_when_titleAtMaxLength")
+        void should_createTodo_when_titleAtMaxLength() {
+            // given — title 恰好 128 字符
+            String maxLengthTitle = "a".repeat(TodoConstants.TITLE_MAX_LENGTH);
+            TodoCreateRequest request = new TodoCreateRequest();
+            request.setTitle(maxLengthTitle);
+            request.setDescription("描述");
+
+            when(todoItemMapper.insert(any(TodoItemDO.class))).thenReturn(1);
+
+            // when
+            TodoCreateResult result = todoService.createTodo(request);
+
+            // then
+            assertThat(result).isNotNull();
+            assertThat(result.getTitle()).isEqualTo(maxLengthTitle);
+            assertThat(result.getTitle()).hasSize(TodoConstants.TITLE_MAX_LENGTH);
+        }
+
+        @Test
+        @DisplayName("should_createTodo_when_descriptionAtMaxLength")
+        void should_createTodo_when_descriptionAtMaxLength() {
+            // given — description 恰好 1024 字符
+            String maxDesc = "b".repeat(TodoConstants.DESCRIPTION_MAX_LENGTH);
+            TodoCreateRequest request = new TodoCreateRequest();
+            request.setTitle("测试");
+            request.setDescription(maxDesc);
+
+            when(todoItemMapper.insert(any(TodoItemDO.class))).thenReturn(1);
+
+            // when
+            TodoCreateResult result = todoService.createTodo(request);
+
+            // then
+            assertThat(result).isNotNull();
+            assertThat(result.getDescription()).isEqualTo(maxDesc);
+            assertThat(result.getDescription()).hasSize(
+                    TodoConstants.DESCRIPTION_MAX_LENGTH
+            );
+        }
+
+        @Test
+        @DisplayName("should_createTodo_when_emptyDescription")
+        void should_createTodo_when_emptyDescription() {
+            // given — description 为空字符串（可选字段）
+            TodoCreateRequest request = new TodoCreateRequest();
+            request.setTitle("无描述任务");
+
+            when(todoItemMapper.insert(any(TodoItemDO.class))).thenReturn(1);
+
+            // when
+            TodoCreateResult result = todoService.createTodo(request);
+
+            // then
+            assertThat(result).isNotNull();
+            assertThat(result.getDescription()).isNull();
         }
     }
 }

@@ -52,7 +52,10 @@ public class GlobalExceptionHandler {
         String field = fieldError.getField();
         String code = fieldError.getCode();
         if ("title".equals(field)) {
-            return "NotBlank".equals(code) ? ApiResult.fail(ErrorCodeEnum.TODO_001) : ApiResult.fail(ErrorCodeEnum.TODO_002);
+            if ("NotBlank".equals(code)) {
+                return ApiResult.fail(ErrorCodeEnum.TODO_001);
+            }
+            return ApiResult.fail(ErrorCodeEnum.TODO_002);
         }
         return ApiResult.fail(ErrorCodeEnum.TODO_003);
     }
