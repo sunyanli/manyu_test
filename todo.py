@@ -9,6 +9,7 @@ import argparse
 import json
 import os
 import sys
+import tempfile
 
 DEFAULT_TODOS_PATH = "todos.json"
 
@@ -28,7 +29,11 @@ def load_todos():
     if not os.path.exists(path):
         return []
     with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        try:
+            return json.load(f)
+        except json.JSONDecodeError as e:
+            print(f"Error: failed to parse {path}: {e}", file=sys.stderr)
+            sys.exit(1)
 
 
 def save_todos(todos):
@@ -38,8 +43,10 @@ def save_todos(todos):
         todos: List of dicts with 'name' and 'user' keys.
     """
     path = _todos_path()
-    with open(path, "w", encoding="utf-8") as f:
+    tmp_path = path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(todos, f, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, path)
 
 
 def add_todo(name, user):
