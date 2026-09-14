@@ -53,25 +53,23 @@ def add_todo(name, user):
         str: Success message.
 
     Raises:
-        SystemExit: If name is empty or a duplicate for the same user.
+        ValueError: If name is empty or a duplicate for the same user.
     """
-    if not name.strip():
-        print("Error: item name cannot be empty.", file=sys.stderr)
-        sys.exit(1)
+    name = name.strip()
+    if not name:
+        raise ValueError("Error: item name cannot be empty.")
 
     todos = load_todos()
     for item in todos:
         if item["name"] == name and item["user"] == user:
-            print(
-                f"Error: item '{name}' for user '{user}' already exists.",
-                file=sys.stderr,
+            raise ValueError(
+                f"Error: item '{name}' for user '{user}' already exists."
             )
-            sys.exit(1)
 
     item = {"name": name, "user": user}
     todos.append(item)
     save_todos(todos)
-    print(f"Added: '{name}' for {user}")
+    return f"Added: '{name}' for {user}"
 
 
 def list_todos():
@@ -104,7 +102,12 @@ def main():
     args = parser.parse_args()
 
     if args.command == "add":
-        add_todo(args.name, args.user)
+        try:
+            msg = add_todo(args.name, args.user)
+            print(msg)
+        except ValueError as e:
+            print(e, file=sys.stderr)
+            sys.exit(1)
     elif args.command == "list":
         list_todos()
 
