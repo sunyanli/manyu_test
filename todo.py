@@ -5,14 +5,12 @@ import argparse
 import sqlite3
 import sys
 
-_DB_PATH = "todo.db"
+_DB_PATH = "todos.db"
 
 
-def init_db(db_path: str | None = None) -> None:
+def init_db() -> None:
     """幂等建表，可多次调用不报错。"""
-    if db_path is None:
-        db_path = _DB_PATH
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(_DB_PATH)
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS todos (
@@ -27,14 +25,12 @@ def init_db(db_path: str | None = None) -> None:
     conn.close()
 
 
-def add_todo(title: str, description: str = "", db_path: str | None = None) -> dict:
+def add_todo(title: str, description: str = "") -> dict:
     """将待办事项写入 SQLite 并返回完整字典。空标题抛出 ValueError。"""
     if not title or not title.strip():
         raise ValueError("title 不能为空")
-    if db_path is None:
-        db_path = _DB_PATH
 
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(_DB_PATH)
     cursor = conn.execute(
         "INSERT INTO todos (title, description) VALUES (?, ?)",
         (title.strip(), description),
@@ -72,7 +68,7 @@ def main() -> None:
         init_db()
         try:
             result = add_todo(args.title, args.description)
-            print(f"已添加待办事项: #{result['id']} {result['title']}")
+            print(f"已添加待办事项: #{result['id']} {result['title']} (创建时间: {result['created_at']})")
         except ValueError as e:
             print(f"错误: {e}", file=sys.stderr)
             sys.exit(1)

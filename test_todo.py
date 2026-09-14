@@ -18,7 +18,7 @@ class TestInitDB(unittest.TestCase):
         todo._DB_PATH = self.db_path
 
     def tearDown(self):
-        todo._DB_PATH = "todo.db"
+        todo._DB_PATH = "todos.db"
         os.unlink(self.db_path)
 
     def test_init_db_creates_table(self):
@@ -50,7 +50,7 @@ class TestAddTodo(unittest.TestCase):
         todo.init_db()
 
     def tearDown(self):
-        todo._DB_PATH = "todo.db"
+        todo._DB_PATH = "todos.db"
         os.unlink(self.db_path)
 
     def _get_row_count(self):
