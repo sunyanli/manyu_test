@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workbench · 内容清单 · 3秒小狗叫</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1d2129; --ink:#e8eaed;
+    --sub:#9aa0a8; --line:#2a2f38; --accent:#5ec8ff; --accent2:#ffd166;
+    --ok:#7ee29a; --warn:#ffb454; --s1:#4a9eff; --s2:#ff7a7a; --s3:#b58cff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    line-height:1.6;padding:24px 20px 64px}
+  .wrap{max-width:1180px;margin:0 auto}
+  header{margin-bottom:22px}
+  h1{font-size:22px;margin:0 0 6px}
+  .meta{color:var(--sub);font-size:13px;display:flex;flex-wrap:wrap;gap:14px}
+  .meta b{color:var(--ink);font-weight:600}
+  .tag{display:inline-block;padding:2px 9px;border-radius:10px;font-size:12px;background:var(--panel2);color:var(--accent);border:1px solid var(--line)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:22px}
+  .card h2{font-size:15px;margin:0 0 16px;color:var(--accent);letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+  .card h2 .n{font-size:11px;color:var(--sub);font-weight:400}
+
+  /* timeline */
+  .timeline{display:flex;height:46px;border-radius:9px;overflow:hidden;border:1px solid var(--line);position:relative}
+  .seg{display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:600;position:relative;overflow:hidden;white-space:nowrap}
+  .seg .pct{position:absolute;bottom:2px;right:6px;font-size:10px;opacity:.7;font-weight:400}
+  .seg.s1{background:linear-gradient(135deg,#3a7fd6,var(--s1));width:16.666%}
+  .seg.s2{background:linear-gradient(135deg,#d65151,var(--s2));width:66.667%}
+  .seg.s3{background:linear-gradient(135deg,#8a5fd6,var(--s3));width:16.666%}
+  .tscale{display:flex;justify-content:space-between;font-size:11px;color:var(--sub);margin-top:6px;font-variant-numeric:tabular-nums}
+  .tlegend{display:flex;gap:18px;margin-top:12px;flex-wrap:wrap;font-size:12px;color:var(--sub)}
+  .tlegend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--sub);font-weight:600;font-size:12px;letter-spacing:.3px;background:var(--panel2)}
+  tr:last-child td{border-bottom:none}
+  td.scn{font-weight:600;white-space:nowrap}
+  td.dur{font-variant-numeric:tabular-nums;color:var(--accent2);white-space:nowrap}
+  td.src{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--accent)}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
+  .d1{background:var(--s1)}.d2{background:var(--s2)}.d3{background:var(--s3)}
+  .anim li{margin:2px 0}
+  ul{margin:0;padding-left:18px}
+
+  /* spec grid */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+  .spec{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .spec .k{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px}
+  .spec .v{font-size:14px;margin-top:3px}
+
+  .verify{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .verify .ok{color:var(--ok);font-size:13px}
+  .check{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+  .check label{display:flex;align-items:center;gap:7px;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;cursor:pointer;user-select:none}
+  .check input{accent-color:var(--accent);width:16px;height:16px}
+  .gate{display:flex;gap:12px;align-items:center;margin-top:18px;padding:14px 16px;border-radius:11px;background:var(--panel2);border:1px dashed var(--line)}
+  .gate button{background:var(--accent);color:#062030;border:none;border-radius:8px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer}
+  .gate button:disabled{background:#3a3f4a;color:#6c727b;cursor:not-allowed}
+  .gate .msg{font-size:13px;color:var(--sub)}
+  .gate .msg b{color:var(--warn)}
+  footer{color:var(--sub);font-size:12px;margin-top:30px;text-align:center}
+  @media(max-width:720px){.seg .label{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>内容清单 Workbench · 3 秒视频「小狗叫」</h1>
+    <div class="meta">
+      <span><b>来源：</b>brief.md（设计 Brief，下游唯一输入）</span>
+      <span><b>整片：</b>3.00s / 1080×1920 竖屏 9:16 / 30fps / MP4(H.264+AAC)</span>
+      <span class="tag">结构门禁：需浏览器确认后方可往下走</span>
+    </div>
+  </header>
+
+  <!-- 时间轴 -->
+  <section class="card">
+    <h2>整片时间轴 <span class="n">单镜不切，仅景别推进</span></h2>
+    <div class="timeline">
+      <div class="seg s1"><span class="label">S1 入画定位</span><span class="pct">16.7%</span></div>
+      <div class="seg s2"><span class="label">S2 张嘴叫（演示）· 核心记忆点</span><span class="pct">66.7%</span></div>
+      <div class="seg s3"><span class="label">S3 收尾定格</span><span class="pct">16.7%</span></div>
+    </div>
+    <div class="tscale"><span>0.00s</span><span>0.50s</span><span>2.50s</span><span>3.00s</span></div>
+    <div class="tlegend">
+      <span><i style="background:var(--s1)"></i>S1 主体建立 0.50s</span>
+      <span><i style="background:var(--s2)"></i>S2 声画卡点 2.00s</span>
+      <span><i style="background:var(--s3)"></i>S3 情绪定格 0.50s</span>
+      <span>时长校验：0.50 + 2.00 + 0.50 = <b style="color:var(--ok)">3.00s ✅</b>（无淡入淡出、无留白）</span>
+    </div>
+  </section>
+
+  <!-- 内容清单表 -->
+  <section class="card">
+    <h2>场景 / 时长 / 内容 / 动画 / 对应源文件 <span class="n">字段映射自 brief.md</span></h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:120px">场景</th>
+          <th style="width:108px">时长</th>
+          <th>内容</th>
+          <th style="width:30%">动画 / 镜头运动</th>
+          <th style="width:24%">对应源文件</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="scn"><span class="dot d1"></span>S1 入画定位</td>
+          <td class="dur">0.00–0.50s<br>0.50s</td>
+          <td>小狗已入画，正面/微侧脸面向镜头，眼神锁定镜头；建立「小狗」主体与萌系质感。声音：极轻环境底噪（室内安静），尚未出声。</td>
+          <td><ul class="anim">
+            <li>中近景，浅景深，镜头对准面部</li>
+            <li>耳朵微动（入画轻微动作）</li>
+            <li>景别：中近景（胸部以上），背景虚化</li>
+          </ul></td>
+          <td class="src">brief.md §1 场景 S1<br>§2.3 景别 S1<br>§4.1 画面素材（幼犬/背景）</td>
+        </tr>
+        <tr>
+          <td class="scn"><span class="dot d2"></span>S2 张嘴叫（演示）</td>
+          <td class="dur">0.50–2.50s<br>2.00s</td>
+          <td>张嘴叫 2–3 声短促连叫；核心记忆点 = 声画卡点。声音：真实幼犬短促叫声，与嘴部开合同帧同步。</td>
+          <td><ul class="anim">
+            <li>面部特写，焦点锁定嘴部与眼部</li>
+            <li>嘴部开合（同帧对齐叫声，容差 ≤1帧/33ms）</li>
+            <li>轻微头部前探 + 耳朵向后抖动</li>
+            <li>景别推进：中近景 → 面部特写</li>
+          </ul></td>
+          <td class="src">brief.md §1 场景 S2<br>§2.3 景别 S2<br>§4.2 声音素材（幼犬叫声）<br>§7 下游执行建议</td>
+        </tr>
+        <tr>
+          <td class="scn"><span class="dot d3"></span>S3 收尾定格</td>
+          <td class="dur">2.50–3.00s<br>0.50s</td>
+          <td>叫声收尾，嘴微张/微闭，眼神依旧盯镜头，定格在小狗表情；留下情绪记忆点，画面自然结束。</td>
+          <td><ul class="anim">
+            <li>特写定格，焦平面稳定在面部</li>
+            <li>焦点回归眼部，表情清晰</li>
+            <li>最后一声余音收尾（无淡出）</li>
+          </ul></td>
+          <td class="src">brief.md §1 场景 S3<br>§2.3 景别 S3<br>§3 信息架构（第3层 收束）</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 画面规格 -->
+  <section class="card">
+    <h2>画面规格与质感 <span class="n">brief.md §2</span></h2>
+    <div class="grid">
+      <div class="spec"><div class="k">分辨率</div><div class="v">1080×1920（竖屏 9:16）</div></div>
+      <div class="spec"><div class="k">帧率</div><div class="v">30fps（3s=90帧）</div></div>
+      <div class="spec"><div class="k">格式</div><div class="v">MP4 / H.264 + AAC</div></div>
+      <div class="spec"><div class="k">色温</div><div class="v">暖中性偏暖 ≈5200K</div></div>
+      <div class="spec"><div class="k">质感</div><div class="v">高饱和不过曝，毛绒根根分明</div></div>
+      <div class="spec"><div class="k">眼神光</div><div class="v">catchlight，瞳孔上方偏左</div></div>
+      <div class="spec"><div class="k">背景</div><div class="v">室内浅色柔光（米白/浅木），无杂物</div></div>
+      <div class="spec"><div class="k">安全区</div><div class="v">面部位于上1/3~2/3，顶120px/底240px</div></div>
+      <div class="spec"><div class="k">品牌元素</div><div class="v">无角标/水印/Logo/字幕/花字</div></div>
+      <div class="spec"><div class="k">声音</div><div class="v">真实幼犬叫，无BGM，无环境音</div></div>
+    </div>
+  </section>
+
+  <!-- 结构门禁 -->
+  <section class="card">
+    <h2>结构门禁确认 <span class="n">在浏览器逐项核对，确认一致后方可往下走</span></h2>
+    <div class="check" id="check">
+      <label><input type="checkbox" data-k="c1"> 整片 3.00s，单镜不切，仅景别推进</label>
+      <label><input type="checkbox" data-k="c2"> S1=0.50s / S2=2.00s / S3=0.50s，时长合计 3.00s</label>
+      <label><input type="checkbox" data-k="c3"> 三段叙事：主体建立 → 声画卡点 → 情绪定格</label>
+      <label><input type="checkbox" data-k="c4"> 核心记忆点 = 嘴部开合与叫声同帧同步</label>
+      <label><input type="checkbox" data-k="c5"> 竖屏 1080×1920 / 30fps / MP4，无品牌元素</label>
+      <label><input type="checkbox" data-k="c6"> 品种=田园幼犬，背景=室内浅色柔光，无BGM</label>
+    </div>
+    <div class="gate">
+      <button id="confirm" disabled>确认结构一致，放行下一步</button>
+      <span class="msg" id="gmsg">请先在浏览器逐项核对上方勾选项；未确认一致前，下游不许往下走。</span>
+    </div>
+  </section>
+
+  <footer>Workbench 由 brief.md 自动生成 · 内容清单字段：场景 / 时长 / 内容 / 动画 / 对应源文件</footer>
+</div>
+
+<script>
+  const checks=[...document.querySelectorAll('#check input')];
+  const btn=document.getElementById('confirm');
+  const msg=document.getElementById('gmsg');
+  function update(){
+    const n=checks.filter(c=>c.checked).length;
+    if(n===checks.length){
+      btn.disabled=false;
+      msg.innerHTML='<b>结构核对完成。</b>点击放行按钮，记录确认结果。';
+    }else{
+      btn.disabled=true;
+      msg.innerHTML='已核对 '+n+'/'+checks.length+' 项；全部核对一致后方可放行。';
+    }
+  }
+  checks.forEach(c=>c.addEventListener('change',update));
+  btn.addEventListener('click',()=>{
+    msg.innerHTML='<b style="color:var(--ok)">已确认结构一致，门禁放行 ✅</b> 可继续往下游推进。';
+    btn.textContent='已放行';
+    btn.disabled=true;
+  });
+</script>
+</body>
+</html>
