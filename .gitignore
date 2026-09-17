@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Remotion build output
+out/
+dist/
+build/
+.remotion/
+
+# Node prebuilt binary (not part of repo)
+node-v20.17.0-linux-x64/
+node-v22.11.0-linux-x64/
+
+# OS / editor
+.DS_Store
+*.swp

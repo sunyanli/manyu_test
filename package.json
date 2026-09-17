@@ -1,0 +1,23 @@
+{
+  "name": "puppy-bark-3s",
+  "version": "1.0.0",
+  "description": "Remotion project: 3-second vertical video — puppy barking at camera",
+  "scripts": {
+    "dev": "remotion studio",
+    "build": "remotion render Main out/video.mp4",
+    "upgrade": "remotion upgrade",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.242",
+    "@remotion/player": "4.0.242",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "remotion": "4.0.242"
+  },
+  "devDependencies": {
+    "@types/react": "19.0.0",
+    "@types/react-dom": "19.0.0",
+    "typescript": "5.7.2"
+  }
+}
