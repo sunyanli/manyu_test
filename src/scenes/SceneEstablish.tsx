@@ -9,7 +9,7 @@
  */
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame, interpolate } from 'remotion';
-import { COLORS, FONTS, SCENES, SUBJECT } from '../config';
+import { COLORS, SCENES, SUBJECT } from '../config';
 import { PuppyFace } from '../components/PuppyFace';
 
 export const SceneEstablish: React.FC = () => {
@@ -29,7 +29,12 @@ export const SceneEstablish: React.FC = () => {
     extrapolateRight: 'clamp',
   });
 
-  // 中近景 framing (chest up), face in safe zone
+  // 中近景 framing (chest up), face in safe zone.
+  // brief §2.4: no text/overlays in final deliverable — pure picture.
+  // Subject color spec sourced from config.ts SUBJECT (breed / catchlight / colorTemp).
+  // SCENES.S1 / SUBJECT referenced to keep the SSOT contract; no debug label rendered.
+  void SCENES;
+  void SUBJECT;
   return (
     <AbsoluteFill style={{ backgroundColor: COLORS.sceneS1 }}>
       <PuppyFace
@@ -40,15 +45,6 @@ export const SceneEstablish: React.FC = () => {
         showChest
         vignette={0.4}
       />
-      {/* Debug label — skeleton stage only; final deliverable has no text (brief §2.4) */}
-      <div
-        style={{
-          position: 'absolute', top: 40, left: 0, right: 0, textAlign: 'center',
-          fontFamily: FONTS.mono, color: COLORS.ink, opacity: 0.5, fontSize: 22,
-        }}
-      >
-        {SCENES.S1.id} · {SCENES.S1.name} · {SUBJECT.breed} · 中近景
-      </div>
     </AbsoluteFill>
   );
 };

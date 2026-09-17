@@ -10,7 +10,7 @@
  */
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame, interpolate } from 'remotion';
-import { COLORS, FONTS, SCENES } from '../config';
+import { COLORS } from '../config';
 import { PuppyFace } from '../components/PuppyFace';
 
 export const SceneFreeze: React.FC = () => {
@@ -38,15 +38,6 @@ export const SceneFreeze: React.FC = () => {
         showChest={false}
         vignette={0.62}
       />
-      {/* Debug label — skeleton stage only; final deliverable has no text (brief §2.4) */}
-      <div
-        style={{
-          position: 'absolute', top: 40, left: 0, right: 0, textAlign: 'center',
-          fontFamily: FONTS.mono, color: COLORS.ink, opacity: 0.5, fontSize: 22,
-        }}
-      >
-        {SCENES.S3.id} · {SCENES.S3.name} · 特写定格 · 自然结束
-      </div>
     </AbsoluteFill>
   );
 };

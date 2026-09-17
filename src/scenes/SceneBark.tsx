@@ -12,7 +12,7 @@
  */
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame, interpolate } from 'remotion';
-import { AUDIO, COLORS, FONTS, SCENES } from '../config';
+import { COLORS } from '../config';
 import { PuppyFace } from '../components/PuppyFace';
 
 /**
@@ -70,15 +70,6 @@ export const SceneBark: React.FC = () => {
         showChest={false}
         vignette={0.6}
       />
-      {/* Debug label — skeleton stage only; final deliverable has no text (brief §2.4) */}
-      <div
-        style={{
-          position: 'absolute', top: 40, left: 0, right: 0, textAlign: 'center',
-          fontFamily: FONTS.mono, color: COLORS.ink, opacity: 0.5, fontSize: 22,
-        }}
-      >
-        {SCENES.S2.id} · {SCENES.S2.name} · 面部特写 · 同帧同步 ≤{AUDIO.syncToleranceMs}ms · 3 pulses
-      </div>
     </AbsoluteFill>
   );
 };

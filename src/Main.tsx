@@ -13,16 +13,16 @@
  * No fade-in/out, no extra padding (brief.md §1 / §6.1).
  */
 import React from 'react';
-import { AbsoluteFill, Series, interpolate, useCurrentFrame } from 'remotion';
-import { COLORS, FONTS, SCENES, VIDEO } from './config';
+import { AbsoluteFill, Series } from 'remotion';
+import { COLORS, FONTS, SCENES } from './config';
 import { SceneEstablish } from './scenes/SceneEstablish';
 import { SceneBark } from './scenes/SceneBark';
 import { SceneFreeze } from './scenes/SceneFreeze';
 
 export const Main: React.FC = () => {
-  const frame = useCurrentFrame();
-
-  // brief.md §1: single shot, no cuts — Series sequences the three framing stages
+  // brief.md §1: single shot, no cuts — Series sequences the three framing stages.
+  // brief.md §2.4: no text/overlays/brand elements in final deliverable — pure picture.
+  void SCENES;
   return (
     <AbsoluteFill style={{ backgroundColor: COLORS.background, fontFamily: FONTS.family }}>
       <Series>
@@ -36,42 +36,6 @@ export const Main: React.FC = () => {
           <SceneFreeze />
         </Series.Sequence>
       </Series>
-
-      {/* Debug timeline ruler — skeleton only; final video has no text/overlays */}
-      <DebugTimeline frame={frame} />
     </AbsoluteFill>
-  );
-};
-
-/**
- * Minimal scene-progress ruler overlay for the skeleton stage.
- * brief.md §2.4: no overlays in final deliverable — this will be removed
- * once real footage scenes are composited.
- */
-const DebugTimeline: React.FC<{ frame: number }> = ({ frame }) => {
-  const progress = frame / VIDEO.totalFrames;
-  const opacity = interpolate(frame, [VIDEO.totalFrames - 3, VIDEO.totalFrames], [0.7, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: 4,
-        opacity,
-      }}
-    >
-      <div
-        style={{
-          width: `${progress * 100}%`,
-          height: '100%',
-          backgroundColor: COLORS.accent,
-        }}
-      />
-    </div>
   );
 };
