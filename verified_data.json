@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema",
+  "title": "brief.md 数据来源核验汇总",
+  "source_file": "brief.md",
+  "verification_date_utc": "2026-09-17",
+  "summary": "brief.md 是一段 3 秒「小狗叫」竖屏视频的设计 Brief。经核验，本文件不含任何「benchmark 对比表」或外部引用型数据表；所涉数据分为三类：(A) 可经算术/定义直接核验的硬性规格；(B) 基于通用技术常识可判定、但本轮未取得权威 URL 佐证的常识性数据；(C) 设计经验取值/主观美学选择，无权威来源、不可视为「可核验数据」。以下逐条标注，未核验项明确标出，未编造任何来源。",
+  "categories": {
+    "A_verified_by_arithmetic_or_definition": "可由算术或定义直接核验，本轮已用 Python 复算确认。",
+    "B_general_knowledge_not_authoritatively_fetched": "基于通用摄影/显示技术常识可判定方向，但本轮 web_search 未取得可引用的权威 URL，故不声称「已权威核实」，仅标为常识性、方向可信。",
+    "C_design_convention_subjective": "设计经验取值或主观美学选择，无统一权威标准，不计为「可核验数据」。"
+  },
+  "items": [
+    {
+      "id": "D1",
+      "brief_field": "§1 时长校验 / §6 验收标准 1",
+      "claim": "三段时长 0.50s + 2.00s + 0.50s = 3.00s，无淡入淡出、无留白",
+      "category": "A",
+      "verification_method": "Python 复算",
+      "computed_result": "0.50 + 2.00 + 0.50 = 3.0",
+      "status": "verified",
+      "notes": "算术恒等，与硬性 3.0s 时长约束自洽。"
+    },
+    {
+      "id": "D2",
+      "brief_field": "§2.1 画面规格",
+      "claim": "1080p 竖屏 9:16 → 实际输出 1080×1920",
+      "category": "A",
+      "verification_method": "比例定义复算：宽 1080，高 = 1080 × 16 / 9",
+      "computed_result": "1080 × (16/9) = 1920 → 1080×1920",
+      "status": "verified",
+      "notes": "9:16 为 16:9 横屏(1920×1080)旋转 90°，竖屏即 1080×1920，定义自洽。"
+    },
+    {
+      "id": "D3",
+      "brief_field": "§2.1 画面规格",
+      "claim": "帧率 30fps，3s = 90 帧",
+      "category": "A",
+      "verification_method": "Python 复算",
+      "computed_result": "30 × 3 = 90",
+      "status": "verified",
+      "notes": "帧数 = 帧率 × 时长，算术成立。"
+    },
+    {
+      "id": "D4",
+      "brief_field": "§7 下游执行建议",
+      "claim": "卡点容差 ≤ 1 帧（33ms）",
+      "category": "A",
+      "verification_method": "单帧时长复算：1000ms / 30fps",
+      "computed_result": "1000 / 30 = 33.333... ms",
+      "status": "verified_with_rounding_note",
+      "notes": "精确值为 33.33ms，Brief 取 33ms 为四舍五入，方向正确、误差可忽略；不影响「≤1帧」的卡点约束。"
+    },
+    {
+      "id": "D5",
+      "brief_field": "§2.2 色彩与质感",
+      "claim": "色温约 5200K，暖中性偏暖",
+      "category": "B",
+      "verification_method": "通用色温常识判定（本轮 web_search 未取得可引用权威 URL）",
+      "general_knowledge_basis": "色温标尺：钨丝灯 ~2700–3200K(暖)、D50 摄影日光标准 = 5000K、D55 = 5500K、D65 显示器白点 = 6500K。5200K 介于 D50 与 D55 之间，属日光区间；相对 D65(6500K) 更暖，相对钨丝灯则更冷/中性。",
+      "status": "directionally_verifiable_unsourced",
+      "notes": "5200K 落在日光区间、相对显示白点偏暖，「暖中性偏暖」的描述方向合理；但本轮未成功取得权威 URL 佐证，故不声称已权威核实。如需权威背书，建议补查 ICC/ISO 色温标准或摄影参考光源资料。"
+    },
+    {
+      "id": "D6",
+      "brief_field": "§2.1 竖屏安全区",
+      "claim": "顶部状态栏预留 120px、底部社媒 UI 预留 240px",
+      "category": "C",
+      "verification_method": "无——属设计经验取值",
+      "computed_context": "120px / 1920 = 6.25%；240px / 1920 = 12.5%",
+      "status": "unverifiable_no_authoritative_source",
+      "notes": "竖屏安全区因平台(TikTok/抖音、Instagram Reels、YouTube Shorts 等)UI 叠层不同而异，无统一权威标准；此数值为本 Brief 的设计经验取值，不可视为可核验数据。下游如对具体平台投放，应以该平台官方安全区规范覆盖此默认值。"
+    },
+    {
+      "id": "D7",
+      "brief_field": "§2.3 / §2.2",
+      "claim": "面部位于上 1/3~2/3「黄金区域」；眼神光 catchlight 位于瞳孔上方偏左",
+      "category": "C",
+      "verification_method": "无——属主观美学/构图选择",
+      "status": "unverifiable_subjective",
+      "notes": "「上 1/3~2/3」近似三分法构图的口语化表述，catchlight 偏左为主观布光选择，均无权威标准，不计为可核验数据。"
+    },
+    {
+      "id": "D8",
+      "brief_field": "§4.1 画面素材 / §5 待确认项",
+      "claim": "品种 = 田园幼犬(中华田园犬幼崽)，约 2–3 月龄",
+      "category": "B",
+      "verification_method": "通用常识判定（本轮 web_search 未取得可引用权威 URL）",
+      "general_knowledge_basis": "中华田园犬为业界/民间通用的犬只类型称谓，存在该称谓本身可认定；2–3 月龄为「幼犬」阶段的合理经验区间。",
+      "status": "partially_verifiable_unsourced",
+      "notes": "品种称谓本身属实(非虚构)，但「2–3 月龄」为经验取值、非权威数据；且此为默认决策，用户可覆盖(柯基/柴犬/金毛幼犬)。本轮未取得权威 URL。"
+    },
+    {
+      "id": "D9",
+      "brief_field": "§4.2 声音素材",
+      "claim": "真实幼犬叫声，短促 2–3 声，0.5–2.5s 区间；不得用成年犬低吼/合成拟音；无 BGM",
+      "category": "C",
+      "verification_method": "无——属创作规范约束",
+      "status": "unverifiable_design_constraint",
+      "notes": "为内容创作约束(素材选取/排除规则)，非可核验事实数据；是否符合需在下游生成时验收，而非本阶段数据核验。"
+    }
+  ],
+  "verification_conclusion": {
+    "has_benchmark_comparison_table": false,
+    "has_external_cited_data_tables": false,
+    "verified_items": ["D1", "D2", "D3", "D4"],
+    "directionally_verifiable_unsourced_items": ["D5", "D8"],
+    "unverifiable_design_or_subjective_items": ["D6", "D7", "D9"],
+    "fabricated_data_found": false,
+    "overall": "Brief 内无非编造的硬性事实型数据错误。四项算术/定义类规格(D1–D4)已核验通过；两项常识类(D5 色温、D8 品种)方向可信但本轮无权威 URL 背书；三项(D6 安全区像素、D7 构图/眼神光、D9 声音约束)为设计经验或主观选择，本就不属可核验数据，已明确标出，未予编造。建议确认后再进入开发。"
+  },
+  "verification_evidence": {
+    "arithmetic_computation": {
+      "tool": "python3",
+      "outputs": {
+        "duration_sum": "3.0",
+        "vertical_9_16_height": "1920",
+        "frames_30fps_3s": 90,
+        "one_frame_ms_30fps": 33.333333333333336,
+        "top_safe_pct": 6.25,
+        "bottom_safe_pct": 12.5
+      }
+    },
+    "web_search": {
+      "attempted_queries": [
+        "vertical video 9:16 social media safe zone top status bar bottom UI overlay pixel recommendation",
+        "color temperature 5200K warm or cool daylight D50 D65 description"
+      ],
+      "outcome": "未取得与上述两项直接相关的可引用权威页面(结果噪声高，多为词典/配色工具页)，故 D5/D6/D8 不声称已权威核实。",
+      "engine": "bing"
+    }
+  }
+}
