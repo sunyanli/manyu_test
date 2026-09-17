@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.antdigital.video.dao.mapper.VideoResultMapper">
+
+    <resultMap id="BaseResultMap" type="com.antdigital.video.model.entity.VideoResultDO">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="tenant_id" property="tenantId" jdbcType="VARCHAR"/>
+        <result column="task_id" property="taskId" jdbcType="BIGINT"/>
+        <result column="result_url" property="resultUrl" jdbcType="VARCHAR"/>
+        <result column="object_key" property="objectKey" jdbcType="VARCHAR"/>
+        <result column="file_size" property="fileSize" jdbcType="BIGINT"/>
+        <result column="duration_sec" property="durationSec" jdbcType="INTEGER"/>
+        <result column="checksum" property="checksum" jdbcType="VARCHAR"/>
+        <result column="gmt_create" property="gmtCreate" jdbcType="TIMESTAMP"/>
+        <result column="gmt_modified" property="gmtModified" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, tenant_id, task_id, result_url, object_key, file_size, duration_sec, checksum, gmt_create, gmt_modified
+    </sql>
+
+    <insert id="insert" parameterType="com.antdigital.video.model.entity.VideoResultDO"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO video_result
+            (tenant_id, task_id, result_url, object_key, file_size, duration_sec, checksum, gmt_create, gmt_modified)
+        VALUES
+            (#{tenantId}, #{taskId}, #{resultUrl}, #{objectKey}, #{fileSize}, #{durationSec}, #{checksum}, NOW(), NOW())
+    </insert>
+
+    <select id="selectByTaskId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM video_result
+        WHERE task_id = #{taskId}
+        ORDER BY gmt_create DESC
+    </select>
+
+</mapper>

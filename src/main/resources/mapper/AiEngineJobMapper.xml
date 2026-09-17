@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.antdigital.video.dao.mapper.AiEngineJobMapper">
+
+    <resultMap id="BaseResultMap" type="com.antdigital.video.model.entity.AiEngineJobDO">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="tenant_id" property="tenantId" jdbcType="VARCHAR"/>
+        <result column="task_id" property="taskId" jdbcType="BIGINT"/>
+        <result column="engine_job_id" property="engineJobId" jdbcType="VARCHAR"/>
+        <result column="engine_type" property="engineType" jdbcType="VARCHAR"/>
+        <result column="callback_status" property="callbackStatus" jdbcType="VARCHAR"/>
+        <result column="raw_payload" property="rawPayload" jdbcType="VARCHAR"/>
+        <result column="gmt_create" property="gmtCreate" jdbcType="TIMESTAMP"/>
+        <result column="gmt_modified" property="gmtModified" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, tenant_id, task_id, engine_job_id, engine_type, callback_status, raw_payload, gmt_create, gmt_modified
+    </sql>
+
+    <insert id="insert" parameterType="com.antdigital.video.model.entity.AiEngineJobDO"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_engine_job
+            (tenant_id, task_id, engine_job_id, engine_type, callback_status, gmt_create, gmt_modified)
+        VALUES
+            (#{tenantId}, #{taskId}, #{engineJobId}, #{engineType}, #{callbackStatus}, NOW(), NOW())
+    </insert>
+
+    <select id="selectByEngineJobId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM ai_engine_job
+        WHERE engine_job_id = #{engineJobId}
+        LIMIT 1
+    </select>
+
+    <update id="updateCallbackStatus">
+        UPDATE ai_engine_job
+        SET callback_status = #{callbackStatus}, raw_payload = #{rawPayload}, gmt_modified = NOW()
+        WHERE id = #{id}
+    </update>
+
+</mapper>

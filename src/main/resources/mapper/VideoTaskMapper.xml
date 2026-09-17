@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.antdigital.video.dao.mapper.VideoTaskMapper">
+
+    <resultMap id="BaseResultMap" type="com.antdigital.video.model.entity.VideoTaskDO">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="tenant_id" property="tenantId" jdbcType="VARCHAR"/>
+        <result column="task_no" property="taskNo" jdbcType="VARCHAR"/>
+        <result column="prompt" property="prompt" jdbcType="VARCHAR"/>
+        <result column="duration_sec" property="durationSec" jdbcType="INTEGER"/>
+        <result column="resolution" property="resolution" jdbcType="VARCHAR"/>
+        <result column="format" property="format" jdbcType="VARCHAR"/>
+        <result column="aspect_ratio" property="aspectRatio" jdbcType="VARCHAR"/>
+        <result column="status" property="status" jdbcType="VARCHAR"/>
+        <result column="engine_job_id" property="engineJobId" jdbcType="VARCHAR"/>
+        <result column="error_code" property="errorCode" jdbcType="VARCHAR"/>
+        <result column="error_msg" property="errorMsg" jdbcType="VARCHAR"/>
+        <result column="idempotency_key" property="idempotencyKey" jdbcType="VARCHAR"/>
+        <result column="gmt_create" property="gmtCreate" jdbcType="TIMESTAMP"/>
+        <result column="gmt_modified" property="gmtModified" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, tenant_id, task_no, prompt, duration_sec, resolution, format, aspect_ratio,
+        status, engine_job_id, error_code, error_msg, idempotency_key, gmt_create, gmt_modified
+    </sql>
+
+    <insert id="insert" parameterType="com.antdigital.video.model.entity.VideoTaskDO"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO video_task
+            (tenant_id, task_no, prompt, duration_sec, resolution, format, aspect_ratio,
+             status, idempotency_key, gmt_create, gmt_modified)
+        VALUES
+            (#{tenantId}, #{taskNo}, #{prompt}, #{durationSec}, #{resolution}, #{format}, #{aspectRatio},
+             #{status}, #{idempotencyKey}, NOW(), NOW())
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM video_task
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByIdempotencyKey" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM video_task
+        WHERE tenant_id = #{tenantId} AND idempotency_key = #{idempotencyKey}
+    </select>
+
+    <select id="selectByTenantAndStatus" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM video_task
+        WHERE tenant_id = #{tenantId}
+        <if test="status != null and status != ''">
+            AND status = #{status}
+        </if>
+        ORDER BY gmt_create DESC
+        LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <select id="countByTenantAndStatus" resultType="long">
+        SELECT COUNT(*)
+        FROM video_task
+        WHERE tenant_id = #{tenantId}
+        <if test="status != null and status != ''">
+            AND status = #{status}
+        </if>
+    </select>
+
+    <update id="updateStatus">
+        UPDATE video_task
+        SET status = #{status}, gmt_modified = NOW()
+        WHERE id = #{id} AND status = #{expectStatus}
+    </update>
+
+    <update id="updateEngineJobId">
+        UPDATE video_task
+        SET engine_job_id = #{engineJobId}, status = 'SUBMITTED', gmt_modified = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateError">
+        UPDATE video_task
+        SET status = #{status}, error_code = #{errorCode}, error_msg = #{errorMsg}, gmt_modified = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="cancel">
+        UPDATE video_task
+        SET status = 'CANCELLED', gmt_modified = NOW()
+        WHERE id = #{id} AND status IN ('CREATED', 'SUBMITTED', 'PROCESSING')
+    </update>
+
+</mapper>
