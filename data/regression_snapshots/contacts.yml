@@ -1,0 +1,50 @@
+name: "通讯录管理"
+executed: true
+stats:
+  total: 13
+  passed: 13
+  failed: 0
+  blocked: 0
+  skipped: 0
+cases:
+  - id: "CT-001"
+    title: "添加好友（扫码）"
+    result: "passed"
+  - id: "CT-002"
+    title: "添加好友（手机号搜索）"
+    result: "passed"
+  - id: "CT-003"
+    title: "添加好友（微信号搜索）"
+    result: "passed"
+  - id: "CT-004"
+    title: "删除好友"
+    result: "passed"
+  - id: "CT-005"
+    title: "好友备注修改"
+    result: "passed"
+  - id: "CT-006"
+    title: "好友分组管理"
+    result: "passed"
+  - id: "CT-007"
+    title: "黑名单功能"
+    result: "passed"
+  - id: "CT-008"
+    title: "通讯录搜索功能"
+    result: "passed"
+  - id: "CT-009"
+    title: "通讯录同步功能"
+    result: "passed"
+  - id: "CT-010"
+    title: "群聊创建与管理"
+    result: "passed"
+  - id: "CT-011"
+    title: "群成员管理"
+    result: "passed"
+  - id: "CT-012"
+    title: "群公告功能"
+    result: "passed"
+  - id: "CT-013"
+    title: "群聊消息免打扰"
+    result: "passed"
+defects: []
+risks: []

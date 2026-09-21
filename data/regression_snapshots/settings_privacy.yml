@@ -1,0 +1,47 @@
+name: "设置与隐私"
+executed: true
+stats:
+  total: 11
+  passed: 11
+  failed: 0
+  blocked: 0
+  skipped: 0
+cases:
+  - id: "SP-001"
+    title: "修改个人信息（头像/昵称）"
+    result: "passed"
+  - id: "SP-002"
+    title: "修改绑定手机号"
+    result: "passed"
+  - id: "SP-003"
+    title: "修改登录密码"
+    result: "passed"
+  - id: "SP-004"
+    title: "支付密码修改"
+    result: "passed"
+  - id: "SP-005"
+    title: "隐私设置-朋友圈可见范围"
+    result: "passed"
+  - id: "SP-006"
+    title: "隐私设置-添加我的方式"
+    result: "passed"
+  - id: "SP-007"
+    title: "消息通知设置"
+    result: "passed"
+  - id: "SP-008"
+    title: "语言设置切换"
+    result: "passed"
+  - id: "SP-009"
+    title: "字体大小设置"
+    result: "passed"
+  - id: "SP-010"
+    title: "清理缓存功能"
+    result: "passed"
+  - id: "SP-011"
+    title: "账号注销流程"
+    result: "passed"
+defects: []
+risks:
+  - item: "隐私合规"
+    desc: "预发环境未接入完整的隐私合规检测流水线"
+    mitigation: "上线前由法务/合规团队进行专项隐私审查"

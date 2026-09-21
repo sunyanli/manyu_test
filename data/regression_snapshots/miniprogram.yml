@@ -1,0 +1,49 @@
+name: "小程序入口"
+executed: true
+stats:
+  total: 10
+  passed: 9
+  failed: 1
+  blocked: 0
+  skipped: 0
+cases:
+  - id: "MP-001"
+    title: "首页小程序入口展示"
+    result: "passed"
+  - id: "MP-002"
+    title: "搜索小程序功能"
+    result: "passed"
+  - id: "MP-003"
+    title: "最近使用小程序列表"
+    result: "passed"
+  - id: "MP-004"
+    title: "收藏小程序功能"
+    result: "passed"
+  - id: "MP-005"
+    title: "小程序快捷入口"
+    result: "passed"
+  - id: "MP-006"
+    title: "小程序分类浏览"
+    result: "passed"
+  - id: "MP-007"
+    title: "小程序权限申请"
+    result: "passed"
+  - id: "MP-008"
+    title: "小程序返回主页"
+    result: "passed"
+  - id: "MP-009"
+    title: "小程序内支付跳转"
+    result: "failed"
+  - id: "MP-010"
+    title: "小程序分享功能"
+    result: "passed"
+defects:
+  - id: "BUG-MP-001"
+    desc: "从小程序内发起支付时，偶现无法调起支付窗口"
+    severity: "严重"
+    status: "已提交"
+    owner: "小程序组-陈强"
+risks:
+  - item: "小程序兼容性问题"
+    desc: "部分旧版本微信客户端（<8.0.20）可能不支持新特性"
+    mitigation: "在测试报告中标记最低支持版本，上线前确认灰度策略"
