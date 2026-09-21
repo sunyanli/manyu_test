@@ -1,0 +1,58 @@
+name: "朋友圈/动态"
+executed: true
+stats:
+  total: 14
+  passed: 13
+  failed: 1
+  blocked: 0
+  skipped: 0
+cases:
+  - id: "MM-001"
+    title: "发布纯文字动态"
+    result: "passed"
+  - id: "MM-002"
+    title: "发布图文动态"
+    result: "passed"
+  - id: "MM-003"
+    title: "发布视频动态"
+    result: "passed"
+  - id: "MM-004"
+    title: "动态点赞功能"
+    result: "passed"
+  - id: "MM-005"
+    title: "动态评论功能"
+    result: "passed"
+  - id: "MM-006"
+    title: "评论回复功能"
+    result: "passed"
+  - id: "MM-007"
+    title: "动态删除功能"
+    result: "passed"
+  - id: "MM-008"
+    title: "动态可见范围设置"
+    result: "passed"
+  - id: "MM-009"
+    title: "动态定位功能"
+    result: "passed"
+  - id: "MM-010"
+    title: "动态@好友功能"
+    result: "passed"
+  - id: "MM-011"
+    title: "动态加载性能（下拉刷新）"
+    result: "passed"
+  - id: "MM-012"
+    title: "动态图片预览"
+    result: "passed"
+  - id: "MM-013"
+    title: "动态视频播放"
+    result: "failed"
+  - id: "MM-014"
+    title: "动态分享功能"
+    result: "passed"
+defects:
+  - id: "BUG-MM-001"
+    desc: "iOS端视频动态在WiFi环境下偶现播放卡顿，3G网络下正常"
+    severity: "一般"
+    status: "已提交"
+    owner: "iOS组-王芳"
+risks: []

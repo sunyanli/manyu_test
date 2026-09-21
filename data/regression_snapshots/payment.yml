@@ -1,0 +1,50 @@
+name: "支付相关"
+executed: true
+stats:
+  total: 12
+  passed: 12
+  failed: 0
+  blocked: 0
+  skipped: 0
+cases:
+  - id: "PAY-001"
+    title: "微信支付绑卡"
+    result: "passed"
+  - id: "PAY-002"
+    title: "扫码支付"
+    result: "passed"
+  - id: "PAY-003"
+    title: "转账到零钱"
+    result: "passed"
+  - id: "PAY-004"
+    title: "转账到银行卡"
+    result: "passed"
+  - id: "PAY-005"
+    title: "红包发送与领取"
+    result: "passed"
+  - id: "PAY-006"
+    title: "支付密码校验"
+    result: "passed"
+  - id: "PAY-007"
+    title: "支付限额提示"
+    result: "passed"
+  - id: "PAY-008"
+    title: "支付订单查询"
+    result: "passed"
+  - id: "PAY-009"
+    title: "退款流程"
+    result: "passed"
+  - id: "PAY-010"
+    title: "支付安全验证"
+    result: "passed"
+  - id: "PAY-011"
+    title: "商户收款码"
+    result: "passed"
+  - id: "PAY-012"
+    title: "支付结果通知"
+    result: "passed"
+defects: []
+risks:
+  - item: "支付环境安全"
+    desc: "预发环境支付网关为沙箱模式，与生产环境存在差异"
+    mitigation: "上线前务必在生产环境进行支付全链路验证"
