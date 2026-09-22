@@ -163,6 +163,6 @@ L55|    }
 
 ### P2（可选）
 
-- [ ] **P2** `src/main/java/com/antdigital/sort/SortDirection.java:9` — 确认 `SortDirection` 是否保留，若暂不使用可在文档注明为扩展预留或移除。
-- [ ] **P2** `.agents/changes/task-AUTO-root-5245f04b-2b2a-47c1-89bf-4244d359b8a7/design.md:77` — 澄清「默认走优化版实现」与 S01 定义的表述一致性。
-- [ ] **P2** `src/main/java/com/antdigital/sort/impl/BubbleSort.java:51` — 提取三实现类重复的 `swap` 到公共基类/工具方法。
+- [x] **P2** `src/main/java/com/antdigital/sort/SortDirection.java:9` — 确认 `SortDirection` 是否保留：**保留**。design §5.1.4/§6.2 已明确其为扩展预留（当前未强制使用），类注释亦标注「预留扩展位」，不构成死代码缺陷，无需代码改动。
+- [x] **P2** `.agents/changes/task-AUTO-root-5245f04b-2b2a-47c1-89bf-4244d359b8a7/design.md:77` — 已消除「门面层说明」「模块清单 sort-facade」「§6.2 可扩展性」「§7.2 可灰度」四处「默认走优化版实现」表述与 S01（`sort`→标准升序）的不一致。
+- [x] **P2** `src/main/java/com/antdigital/sort/impl/BubbleSort.java:51` — 已提取重复 `swap` 与判空逻辑到公共基类 `AbstractBubbleSort`，三实现类改为继承并复用。

@@ -1,7 +1,5 @@
 package com.antdigital.sort.impl;
 
-import com.antdigital.sort.SortingAlgorithm;
-
 import java.util.List;
 
 /**
@@ -13,7 +11,7 @@ import java.util.List;
  * @author AiWork
  * @date 2026/09/22
  */
-public class BubbleSort implements SortingAlgorithm {
+public class BubbleSort extends AbstractBubbleSort {
 
     /**
      * 对列表进行原地升序排序。
@@ -24,9 +22,7 @@ public class BubbleSort implements SortingAlgorithm {
      */
     @Override
     public <T extends Comparable<? super T>> List<T> sort(List<T> list) {
-        if (list == null) {
-            throw new IllegalArgumentException("list must not be null");
-        }
+        checkNotNull(list);
         int n = list.size();
         for (int i = 0; i < n; i++) {
             // 每轮结束后，末尾 i 个元素已有序，内层范围收窄
@@ -38,19 +34,5 @@ public class BubbleSort implements SortingAlgorithm {
             }
         }
         return list;
-    }
-
-    /**
-     * 交换列表中两个位置的元素。
-     *
-     * @param list 目标列表
-     * @param i    位置下标
-     * @param j    位置下标
-     * @param <T>  元素类型
-     */
-    private static <T> void swap(List<T> list, int i, int j) {
-        T tmp = list.get(i);
-        list.set(i, list.get(j));
-        list.set(j, tmp);
     }
 }
