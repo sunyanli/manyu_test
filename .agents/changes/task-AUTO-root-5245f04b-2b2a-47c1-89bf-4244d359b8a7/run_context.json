@@ -1,0 +1,11 @@
+{
+  "change_id": "task-AUTO-root-5245f04b-2b2a-47c1-89bf-4244d359b8a7",
+  "stage": "code_review",
+  "skill": "dtazziboot-java-code-review",
+  "reviewed_commit": "0e92210",
+  "blocker_count": 0,
+  "p1_count": 0,
+  "p2_count": 3,
+  "merge_advice": "通过",
+  "report_path": ".agents/changes/task-AUTO-root-5245f04b-2b2a-47c1-89bf-4244d359b8a7/cr_report.md"
+}
