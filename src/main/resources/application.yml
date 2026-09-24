@@ -1,0 +1,19 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: todo-service
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/todo_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.manyu.todo.model.entity
+
+logging:
+  level:
+    com.manyu.todo: info

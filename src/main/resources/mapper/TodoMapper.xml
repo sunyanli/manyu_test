@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.manyu.todo.dao.mapper.TodoMapper">
+
+    <resultMap id="TodoResultMap" type="com.manyu.todo.model.entity.TodoDO">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="name" property="name" jdbcType="VARCHAR"/>
+        <result column="description" property="description" jdbcType="VARCHAR"/>
+        <result column="gmt_create" property="gmtCreate" jdbcType="TIMESTAMP"/>
+        <result column="gmt_modified" property="gmtModified" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.manyu.todo.model.entity.TodoDO"
+            useGeneratedKeys="true" keyProperty="id" keyColumn="id">
+        INSERT INTO todo (name, description, gmt_create, gmt_modified)
+        VALUES (#{name, jdbcType=VARCHAR},
+                #{description, jdbcType=VARCHAR},
+                NOW(),
+                NOW())
+    </insert>
+</mapper>
