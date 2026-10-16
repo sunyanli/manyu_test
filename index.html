@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>俄罗斯方块 · 单文件版</title>
+<style>
+  :root {
+    --bg: #070b18;
+    --panel: #0f172a;
+    --panel-border: rgba(148, 163, 184, 0.25);
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #22d3ee;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: radial-gradient(circle at 50% 0%, #16203c 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  #app {
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 24px;
+    min-height: 100%;
+    position: relative;
+  }
+  #board {
+    box-sizing: content-box;
+    background: #0b1020;
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    box-shadow: 0 0 32px rgba(34, 211, 238, 0.18);
+  }
+  #sidebar { display: flex; flex-direction: column; gap: 12px; width: 200px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .panel h2 {
+    margin: 0 0 6px;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .stats > div { display: flex; justify-content: space-between; padding: 2px 0; font-size: 14px; }
+  .stats .k { color: var(--muted); }
+  .stats .v { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .keys { font-size: 12px; color: var(--muted); line-height: 1.8; }
+  #overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(3, 7, 18, 0.82);
+    backdrop-filter: blur(2px);
+  }
+  #overlay.hidden { display: none; }
+  .overlay-card {
+    width: min(560px, 92vw);
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 20px 22px;
+    text-align: center;
+  }
+  .overlay-card h1 { margin: 0 0 6px; font-size: 22px; }
+  #overlay-sub { margin: 0 0 14px; color: var(--muted); font-size: 14px; white-space: pre-line; }
+  .choice-list { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 12px; }
+  .choice-list.hidden { display: none; }
+  .choice {
+    background: #111c33;
+    color: var(--text);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .choice.active { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 12px rgba(34, 211, 238, 0.35); }
+  .hint { margin: 0; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main id="app">
+  <canvas id="board" aria-label="游戏区"></canvas>
+
+  <aside id="sidebar">
+    <section class="panel">
+      <h2>暂存</h2>
+      <canvas id="hold" aria-label="暂存区"></canvas>
+    </section>
+    <section class="panel">
+      <h2>预览</h2>
+      <canvas id="next" aria-label="预览区"></canvas>
+    </section>
+    <section class="panel stats">
+      <div><span class="k">分数</span><span class="v" id="score">0</span></div>
+      <div><span class="k">等级</span><span class="v" id="level">1</span></div>
+      <div><span class="k">消行</span><span class="v" id="lines">0</span></div>
+      <div><span class="k" id="progress-label">等级</span><span class="v" id="progress">1</span></div>
+    </section>
+    <section class="panel keys">
+      ← → 移动<br />
+      ↑ / X 顺时针<br />
+      Z / Ctrl 逆时针<br />
+      ↓ 软降　Space 硬降<br />
+      C / Shift 暂存<br />
+      P 暂停　Enter 开始
+    </section>
+  </aside>
+
+  <div id="overlay">
+    <div class="overlay-card">
+      <h1 id="overlay-title">俄罗斯方块</h1>
+      <p id="overlay-sub">选择模式与起始等级，按 Enter 开始</p>
+      <div id="mode-list" class="choice-list"></div>
+      <div id="level-list" class="choice-list"></div>
+      <p class="hint">← → 选择模式 · ↑ ↓ 选择起始等级 · Enter 开始/重开 · P 暂停</p>
+    </div>
+  </div>
+</main>
+
+<script id="tetris-core">
+  /* ==========================================================================
+   * 内核（纯逻辑，不接触 DOM）
+   * 顺序：CONST → Tetromino → Board → Randomizer → Scoring → Modes → GameState → 导出
+   * ========================================================================== */
+
+  /* ========== 常量 ========== */
+  const CONST = {
+    COLS: 10,
+    ROWS: 20,
+    HIDDEN_ROWS: 2,
+    CELL: 30,
+    NEXT_COUNT: 3,
+
+    COLORS: {
+      I: '#22d3ee', O: '#facc15', T: '#c084fc',
+      S: '#4ade80', Z: '#f87171', J: '#60a5fa', L: '#fb923c'
+    },
+    GHOST_STROKE: 'rgba(226, 232, 240, 0.45)',
+
+    SCORE_TABLE: { 1: 100, 2: 300, 3: 500, 4: 800 },
+    SOFT_DROP_POINTS_PER_CELL: 1,
+    HARD_DROP_POINTS_PER_CELL: 2,
+    LEVEL_UP_LINES: 10,
+    START_LEVEL_MIN: 1,
+    START_LEVEL_MAX: 15,
+
+    LOCK_DELAY_MS: 500,
+    LOCK_RESET_LIMIT: 15,
+    CLEAR_ANIM_MS: 120,
+    DAS_MS: 170,
+    ARR_MS: 50,
+    SOFT_DROP_FACTOR: 20,
+    MAX_DT_MS: 250,
+    MIN_GRAVITY_MS: 16,
+
+    SPRINT_LINES: 40,
+    ULTRA_MS: 120000,
+
+    KEYS: {
+      MOVE_LEFT: ['ArrowLeft'],
+      MOVE_RIGHT: ['ArrowRight'],
+      ROTATE_CW: ['ArrowUp', 'KeyX'],
+      ROTATE_CCW: ['KeyZ', 'ControlLeft', 'ControlRight'],
+      SOFT_DROP: ['ArrowDown'],
+      HARD_DROP: ['Space'],
+      HOLD: ['KeyC', 'ShiftLeft', 'ShiftRight'],
+      PAUSE: ['KeyP', 'Escape'],
+      START: ['Enter']
+    }
+  };
+
+  /* ========== 方块定义与 SRS 旋转/踢墙表 ========== */
+  const Tetromino = (function () {
+    // 出生姿态（行、列坐标 -> 单元格），3x3 或 4x4 包围盒
+    const BASE = {
+      I: { size: 4, cells: [[0, 1], [1, 1], [2, 1], [3, 1]] },
+      O: { size: 2, cells: [[0, 0], [1, 0], [0, 1], [1, 1]] },
+      T: { size: 3, cells: [[1, 0], [0, 1], [1, 1], [2, 1]] },
+      S: { size: 3, cells: [[1, 0], [2, 0], [0, 1], [1, 1]] },
+      Z: { size: 3, cells: [[0, 0], [1, 0], [1, 1], [2, 1]] },
+      J: { size: 3, cells: [[0, 0], [0, 1], [1, 1], [2, 1]] },
+      L: { size: 3, cells: [[2, 0], [0, 1], [1, 1], [2, 1]] }
+    };
+
+    const TYPES = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
+
+    // 顺时针旋转：(x, y) -> (size - 1 - y, x)
+    function rotateCW(cells, size) {
+      return cells.map(function (c) { return [size - 1 - c[1], c[0]]; });
+    }
+
+    function buildRotations(def) {
+      const out = [];
+      let cells = def.cells.map(function (c) { return c.slice(); });
+      if (def.size === 2) {
+        const flat = cells.map(function (c) { return { x: c[0], y: c[1] }; });
+        return [flat, flat, flat, flat];
+      }
+      for (let i = 0; i < 4; i++) {
+        out.push(cells.map(function (c) { return { x: c[0], y: c[1] }; }));
+        cells = rotateCW(cells, def.size);
+      }
+      return out;
+    }
+
+    const SHAPES = {};
+    TYPES.forEach(function (t) {
+      SHAPES[t] = { size: BASE[t].size, rotations: buildRotations(BASE[t]) };
+    });
+
+    // SRS 官方偏移表为「y 轴向上」，本实现屏幕坐标 y 轴向下，故 dy 全部取反。
+    // 键 "起始态>目标态"（旋转态 0=出生, 1=R, 2=2, 3=L），值 = 依次试探的 [dx, dy]。
+    const KICKS_JLSTZ = {
+      '0>1': [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+      '1>0': [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
+      '1>2': [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
+      '2>1': [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+      '2>3': [[0, 0], [1, 0], [1, -1], [0, 2], [1, 2]],
+      '3>2': [[0, 0], [-1, 0], [-1, 1], [0, -2], [-1, -2]],
+      '3>0': [[0, 0], [-1, 0], [-1, 1], [0, -2], [-1, -2]],
+      '0>3': [[0, 0], [1, 0], [1, -1], [0, 2], [1, 2]]
+    };
+    const KICKS_I = {
+      '0>1': [[0, 0], [-2, 0], [1, 0], [-2, 1], [1, -2]],
+      '1>0': [[0, 0], [2, 0], [-1, 0], [2, -1], [-1, 2]],
+      '1>2': [[0, 0], [-1, 0], [2, 0], [-1, -2], [2, 1]],
+      '2>1': [[0, 0], [1, 0], [-2, 0], [1, 2], [-2, -1]],
+      '2>3': [[0, 0], [2, 0], [-1, 0], [2, -1], [-1, 2]],
+      '3>2': [[0, 0], [-2, 0], [1, 0], [-2, 1], [1, -2]],
+      '3>0': [[0, 0], [1, 0], [-2, 0], [1, 2], [-2, -1]],
+      '0>3': [[0, 0], [-1, 0], [2, 0], [-1, -2], [2, 1]]
+    };
+
+    const SPAWN_X = { I: 3, O: 4, T: 3, S: 3, Z: 3, J: 3, L: 3 };
+
+    function kicksFor(type, from, to) {
+      if (type === 'O') return [[0, 0]];
+      const table = type === 'I' ? KICKS_I : KICKS_JLSTZ;
+      return table[from + '>' + to] || [[0, 0]];
+    }
+    function cells(type, rot) {
+      const rotations = SHAPES[type].rotations;
+      return rotations[((rot % 4) + 4) % 4];
+    }
+    function spawnX(type) { return SPAWN_X[type]; }
+    function spawnY() { return 0; } // 恰好落在 2 行隐藏缓冲区内
+
+    return {
+      TYPES: TYPES, SHAPES: SHAPES, SPAWN_X: SPAWN_X,
+      cells: cells, kicksFor: kicksFor, spawnX: spawnX, spawnY: spawnY
+    };
+  })();
+
+  /* ========== 棋盘（纯函数） ========== */
+  const Board = (function () {
+    const COLS = CONST.COLS;
+    const ROWS = CONST.ROWS;
+    const HIDDEN_ROWS = CONST.HIDDEN_ROWS;
+    const TOTAL_ROWS = ROWS + HIDDEN_ROWS;
+
+    function create() {
+      const board = [];
+      for (let r = 0; r < TOTAL_ROWS; r++) board.push(new Array(COLS).fill(null));
+      return board;
+    }
+
+    function clone(board) {
+      return board.map(function (row) { return row.slice(); });
+    }
+
+    function collides(board, type, x, y, rot) {
+      const list = Tetromino.cells(type, rot);
+      for (let i = 0; i < list.length; i++) {
+        const cx = x + list[i].x;
+        const cy = y + list[i].y;
+        if (cx < 0 || cx >= COLS) return true;
+        if (cy >= TOTAL_ROWS) return true;
+        if (cy >= 0 && board[cy][cx] !== null) return true;
+      }
+      return false;
+    }
+
+    function merge(board, type, x, y, rot) {
+      const next = clone(board);
+      const list = Tetromino.cells(type, rot);
+      for (let i = 0; i < list.length; i++) {
+        const cx = x + list[i].x;
+        const cy = y + list[i].y;
+        if (cy >= 0 && cy < TOTAL_ROWS && cx >= 0 && cx < COLS) next[cy][cx] = type;
+      }
+      return next;
+    }
+
+    function fullRows(board) {
+      const rows = [];
+      for (let r = 0; r < TOTAL_ROWS; r++) {
+        let full = true;
+        for (let c = 0; c < COLS; c++) {
+          if (board[r][c] === null) { full = false; break; }
+        }
+        if (full) rows.push(r);
+      }
+      return rows;
+    }
+
+    function clearRows(board, rows) {
+      const set = {};
+      rows.forEach(function (r) { set[r] = true; });
+      const kept = [];
+      for (let r = 0; r < TOTAL_ROWS; r++) {
+        if (!set[r]) kept.push(board[r].slice());
+      }
+      while (kept.length < TOTAL_ROWS) kept.unshift(new Array(COLS).fill(null));
+      return kept;
+    }
+
+    function clearLines(board) {
+      const rows = fullRows(board);
+      if (rows.length === 0) return { board: board, cleared: 0, rows: [] };
+      return { board: clearRows(board, rows), cleared: rows.length, rows: rows };
+    }
+
+    function isEmptyRow(board, r) {
+      for (let c = 0; c < COLS; c++) if (board[r][c] !== null) return false;
+      return true;
+    }
+
+    return {
+      create: create, clone: clone, collides: collides, merge: merge,
+      fullRows: fullRows, clearRows: clearRows, clearLines: clearLines,
+      isEmptyRow: isEmptyRow,
+      COLS: COLS, ROWS: ROWS, HIDDEN_ROWS: HIDDEN_ROWS, TOTAL_ROWS: TOTAL_ROWS
+    };
+  })();
+
+  /* ========== 7-bag 随机（可注入种子，便于自测复现） ========== */
+  const Randomizer = (function () {
+    const TYPES = Tetromino.TYPES;
+
+    function mulberry32(seed) {
+      let a = seed >>> 0;
+      return function () {
+        a = (a + 0x6D2B79F5) >>> 0;
+        let t = a;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function create(seed) {
+      const rand = mulberry32(typeof seed === 'number' ? seed : Date.now());
+      let bag = [];
+
+      function shuffle(list) {
+        for (let i = list.length - 1; i > 0; i--) {
+          const j = Math.floor(rand() * (i + 1));
+          const tmp = list[i]; list[i] = list[j]; list[j] = tmp;
+        }
+        return list;
+      }
+      function refill() { bag = bag.concat(shuffle(TYPES.slice())); }
+      function next() { if (bag.length === 0) refill(); return bag.shift(); }
+      function peek(n) {
+        const k = n || CONST.NEXT_COUNT;
+        while (bag.length < k) refill();
+        return bag.slice(0, k);
+      }
+
+      return { next: next, peek: peek };
+    }
+
+    return { create: create };
+  })();
+
+  /* ========== 计分 / 等级 / 重力 ========== */
+  const Scoring = (function () {
+    function linePoints(cleared, level) {
+      return (CONST.SCORE_TABLE[cleared] || 0) * level;
+    }
+    function softDropPoints(cells) {
+      return cells * CONST.SOFT_DROP_POINTS_PER_CELL;
+    }
+    function hardDropPoints(cells) {
+      return cells * CONST.HARD_DROP_POINTS_PER_CELL;
+    }
+    function levelFor(totalLines, startLevel) {
+      return startLevel + Math.floor(totalLines / CONST.LEVEL_UP_LINES);
+    }
+    // Guideline 速度曲线：(0.8 - (level-1)*0.007)^(level-1) 秒，下限 MIN_GRAVITY_MS
+    function gravityMs(level) {
+      const l = Math.max(1, Math.min(level, 20));
+      const seconds = Math.pow(0.8 - (l - 1) * 0.007, l - 1);
+      return Math.max(seconds * 1000, CONST.MIN_GRAVITY_MS);
+    }
+    // 消行用「消除瞬间」的等级计分，再用累计行数推进等级
+    function applyClear(state, cleared) {
+      const score = state.score + linePoints(cleared, state.level);
+      const lines = state.lines + cleared;
+      return { score: score, lines: lines, level: levelFor(lines, state.startLevel) };
+    }
+
+    return {
+      linePoints: linePoints,
+      softDropPoints: softDropPoints,
+      hardDropPoints: hardDropPoints,
+      levelFor: levelFor,
+      gravityMs: gravityMs,
+      applyClear: applyClear
+    };
+  })();
+
+  /* ========== 挑战模式（数据化配置，核心规则不分叉） ========== */
+  const Modes = (function () {
+    function pad2(n) { return String(n).padStart(2, '0'); }
+
+    // 毫秒 -> mm:ss.cc（用于 Sprint 用时与 Ultra 倒计时展示）
+    function formatMs(ms) {
+      const total = Math.max(0, Math.floor(ms));
+      const m = Math.floor(total / 60000);
+      const s = Math.floor((total % 60000) / 1000);
+      const cs = Math.floor((total % 1000) / 10);
+      return pad2(m) + ':' + pad2(s) + '.' + pad2(cs);
+    }
+
+    const list = [
+      {
+        id: 'marathon',
+        label: '马拉松',
+        goal: '无尽冲分，堆顶结束',
+        isFinished: function () { return false; },
+        resultText: function (s) {
+          return '总分 ' + s.score + '｜等级 ' + s.level + '｜消行 ' + s.lines;
+        },
+        progressLabel: '等级',
+        progressText: function (s) { return String(s.level); }
+      },
+      {
+        id: 'sprint',
+        label: '40 行竞速',
+        goal: '最快消满 40 行',
+        isFinished: function (s) { return s.lines >= CONST.SPRINT_LINES; },
+        resultText: function (s) {
+          return '用时 ' + formatMs(s.elapsedMs) + '｜消行 ' + s.lines;
+        },
+        progressLabel: '用时',
+        progressText: function (s) { return formatMs(s.elapsedMs); }
+      },
+      {
+        id: 'ultra',
+        label: '限时冲刺',
+        goal: '120 秒内冲最高分',
+        isFinished: function (s) { return s.elapsedMs >= CONST.ULTRA_MS; },
+        resultText: function (s) {
+          return '总分 ' + s.score + '｜消行 ' + s.lines;
+        },
+        progressLabel: '剩余',
+        progressText: function (s) { return formatMs(Math.max(0, CONST.ULTRA_MS - s.elapsedMs)); }
+      }
+    ];
+
+    function byId(id) {
+      for (let i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+      return list[0];
+    }
+    function isOver(mode, state) {
+      return state.topOut === true || mode.isFinished(state) === true;
+    }
+
+    return { list: list, byId: byId, isOver: isOver, formatMs: formatMs };
+  })();
+
+  /* ========== 游戏状态机与时间推进（不接触 DOM） ========== */
+  const GameState = (function () {
+    const STATUS = { READY: 'READY', PLAYING: 'PLAYING', PAUSED: 'PAUSED', GAME_OVER: 'GAME_OVER' };
+
+    function create() {
+      return {
+        status: STATUS.READY,
+        mode: Modes.list[0],
+        startLevel: CONST.START_LEVEL_MIN,
+        board: null,
+        piece: null,
+        next: [],
+        hold: null,
+        canHold: true,
+        score: 0,
+        lines: 0,
+        level: CONST.START_LEVEL_MIN,
+        elapsedMs: 0,
+        topOut: false,
+        dropAccMs: 0,
+        dropIntervalMs: 0,
+        softDropping: false,
+        lockTimerMs: 0,
+        lockResets: 0,
+        grounded: false,
+        clearing: null,
+        rng: null,
+        message: ''
+      };
+    }
+
+    function start(state, modeId, startLevel, seed) {
+      const mode = Modes.byId(modeId);
+      const level = Math.max(CONST.START_LEVEL_MIN, Math.min(CONST.START_LEVEL_MAX, startLevel || CONST.START_LEVEL_MIN));
+      state.mode = mode;
+      state.startLevel = level;
+      state.level = level;
+      state.board = Board.create();
+      state.rng = Randomizer.create(typeof seed === 'number' ? seed : Math.floor(Math.random() * 4294967295));
+      state.next = state.rng.peek(CONST.NEXT_COUNT);
+      state.hold = null;
+      state.canHold = true;
+      state.score = 0;
+      state.lines = 0;
+      state.elapsedMs = 0;
+      state.topOut = false;
+      state.dropAccMs = 0;
+      state.dropIntervalMs = Scoring.gravityMs(level);
+      state.softDropping = false;
+      state.lockTimerMs = 0;
+      state.lockResets = 0;
+      state.grounded = false;
+      state.clearing = null;
+      state.message = '';
+      state.piece = null;
+      state.status = STATUS.PLAYING;
+      spawn(state);
+      return state;
+    }
+
+    function isGrounded(state) {
+      const p = state.piece;
+      if (!p) return false;
+      return Board.collides(state.board, p.type, p.x, p.y + 1, p.rot);
+    }
+
+    function ghostY(state) {
+      const p = state.piece;
+      if (!p) return 0;
+      let y = p.y;
+      while (!Board.collides(state.board, p.type, p.x, y + 1, p.rot)) y++;
+      return y;
+    }
+
+    function topOut(state, message) {
+      state.status = STATUS.GAME_OVER;
+      state.topOut = true;
+      state.softDropping = false;
+      state.message = message;
+    }
+
+    function spawn(state, forcedType) {
+      const type = forcedType || state.rng.next();
+      state.next = state.rng.peek(CONST.NEXT_COUNT);
+      const piece = { type: type, rot: 0, x: Tetromino.spawnX(type), y: Tetromino.spawnY() };
+      state.canHold = true;
+      state.dropAccMs = 0;
+      state.lockTimerMs = 0;
+      state.lockResets = 0;
+      state.grounded = false;
+      state.piece = piece;
+      if (Board.collides(state.board, piece.type, piece.x, piece.y, piece.rot)) {
+        topOut(state, '堆顶');
+      }
+      return state;
+    }
+
+    function afterMoveSucceeded(state) {
+      if (state.grounded && state.lockResets < CONST.LOCK_RESET_LIMIT) {
+        state.lockTimerMs = 0;
+        state.lockResets++;
+      }
+      if (!isGrounded(state)) {
+        state.grounded = false;
+        state.lockTimerMs = 0;
+      }
+    }
+
+    function tryMove(state, dx, dy) {
+      const p = state.piece;
+      if (!p) return false;
+      if (Board.collides(state.board, p.type, p.x + dx, p.y + dy, p.rot)) return false;
+      p.x += dx;
+      p.y += dy;
+      afterMoveSucceeded(state);
+      return true;
+    }
+
+    function tryRotate(state, dir) {
+      const p = state.piece;
+      if (!p || p.type === 'O') return false;
+      const from = p.rot;
+      const to = ((from + dir) % 4 + 4) % 4;
+      const kicks = Tetromino.kicksFor(p.type, from, to);
+      for (let i = 0; i < kicks.length; i++) {
+        const nx = p.x + kicks[i][0];
+        const ny = p.y + kicks[i][1];
+        if (!Board.collides(state.board, p.type, nx, ny, to)) {
+          p.x = nx;
+          p.y = ny;
+          p.rot = to;
+          afterMoveSucceeded(state);
+          return true;
+        }
+      }
+      return false; // 踢墙全部失败：静默保持原姿态
+    }
+
+    function hold(state) {
+      if (!state.canHold || !state.piece) return false;
+      const current = state.piece.type;
+      if (state.hold === null) {
+        state.hold = current;
+        spawn(state);
+      } else {
+        const swap = state.hold;
+        state.hold = current;
+        state.piece = { type: swap, rot: 0, x: Tetromino.spawnX(swap), y: Tetromino.spawnY() };
+        state.next = state.rng.peek(CONST.NEXT_COUNT);
+        state.dropAccMs = 0;
+        state.lockTimerMs = 0;
+        state.lockResets = 0;
+        state.grounded = false;
+        if (Board.collides(state.board, state.piece.type, state.piece.x, state.piece.y, state.piece.rot)) {
+          topOut(state, '堆顶');
+        }
+      }
+      state.canHold = false;
+      return true;
+    }
+
+    function lockPiece(state) {
+      const p = state.piece;
+      if (!p) return;
+      state.board = Board.merge(state.board, p.type, p.x, p.y, p.rot);
+      state.piece = null;
+      state.grounded = false;
+      state.lockTimerMs = 0;
+      state.lockResets = 0;
+      const rows = Board.fullRows(state.board);
+      if (rows.length > 0) {
+        state.clearing = { rows: rows, timerMs: 0 }; // 动画期间暂停重力与锁定
+        state.softDropping = false;
+      } else {
+        spawn(state);
+      }
+    }
+
+    function finishClearing(state) {
+      const rows = state.clearing.rows;
+      state.board = Board.clearRows(state.board, rows);
+      const applied = Scoring.applyClear(
+        { score: state.score, lines: state.lines, level: state.level, startLevel: state.startLevel },
+        rows.length
+      );
+      state.score = applied.score;
+      state.lines = applied.lines;
+      if (applied.level > state.level) {
+        state.level = applied.level;
+        state.dropIntervalMs = Scoring.gravityMs(state.level);
+        state.message = 'LEVEL ' + state.level;
+      }
+      state.clearing = null;
+      spawn(state);
+    }
+
+    function hardDrop(state) {
+      const p = state.piece;
+      if (!p) return 0;
+      const target = ghostY(state);
+      const cells = target - p.y;
+      p.y = target;
+      state.score += Scoring.hardDropPoints(cells);
+      lockPiece(state);
+      return cells;
+    }
+
+    function update(state, dtMs) {
+      if (state.status !== STATUS.PLAYING) return state;
+      const dt = Math.max(0, Math.min(dtMs, CONST.MAX_DT_MS)); // 钳制，避免切后台回来瞬间掉多格
+      state.elapsedMs += dt;
+
+      if (state.mode.isFinished(state)) { // 模式目标达成：40 行竞速满行 / Ultra 倒计时归零
+        state.status = STATUS.GAME_OVER;
+        state.topOut = false; // 模式目标达成不属堆顶：外壳据此区分「目标达成」与「堆顶结束」
+        state.softDropping = false;
+        state.message = state.mode.id === 'sprint' ? '40 行达成' : '时间到';
+        return state;
+      }
+
+      if (state.clearing) {
+        state.clearing.timerMs += dt;
+        if (state.clearing.timerMs >= CONST.CLEAR_ANIM_MS) finishClearing(state);
+        return state;
+      }
+
+      const p = state.piece;
+      if (!p) return state;
+
+      const interval = state.softDropping
+        ? Math.max(state.dropIntervalMs / CONST.SOFT_DROP_FACTOR, CONST.MIN_GRAVITY_MS)
+        : state.dropIntervalMs;
+
+      state.dropAccMs += dt;
+      while (state.dropAccMs >= interval) {
+        state.dropAccMs -= interval;
+        if (!Board.collides(state.board, p.type, p.x, p.y + 1, p.rot)) {
+          p.y += 1;
+          state.grounded = false;
+          state.lockTimerMs = 0;
+          if (state.softDropping) state.score += Scoring.softDropPoints(1);
+        } else {
+          state.grounded = true;
+          break;
+        }
+      }
+
+      if (isGrounded(state)) {
+        state.grounded = true;
+        state.lockTimerMs += dt;
+        if (state.lockTimerMs >= CONST.LOCK_DELAY_MS) lockPiece(state);
+      } else if (state.grounded) {
+        state.grounded = false;
+        state.lockTimerMs = 0;
+      }
+      return state;
+    }
+
+    function applyIntent(state, intent) {
+      if (!intent) return state;
+      if (intent.type === 'pause') {
+        togglePause(state);
+        return state;
+      }
+      if (state.status !== STATUS.PLAYING) return state; // 幂等：忽略非法状态下的操作
+      switch (intent.type) {
+        case 'move': tryMove(state, intent.dx, 0); break;
+        case 'rotate': tryRotate(state, intent.dir); break;
+        case 'softDrop':
+          state.softDropping = intent.on === true;
+          state.dropAccMs = 0;
+          break;
+        case 'hardDrop': hardDrop(state); break;
+        case 'hold': hold(state); break;
+      }
+      return state;
+    }
+
+    function togglePause(state) {
+      if (state.status === STATUS.PLAYING) {
+        state.status = STATUS.PAUSED;
+        state.softDropping = false;
+      } else if (state.status === STATUS.PAUSED) {
+        state.status = STATUS.PLAYING;
+      }
+      return state;
+    }
+
+    function toReady(state) {
+      state.status = STATUS.READY;
+      state.softDropping = false;
+      return state;
+    }
+
+    return {
+      STATUS: STATUS,
+      create: create,
+      start: start,
+      spawn: spawn,
+      update: update,
+      applyIntent: applyIntent,
+      tryMove: tryMove,
+      tryRotate: tryRotate,
+      hold: hold,
+      hardDrop: hardDrop,
+      lockPiece: lockPiece,
+      ghostY: ghostY,
+      isGrounded: isGrounded,
+      togglePause: togglePause,
+      toReady: toReady
+    };
+  })();
+
+  /* ========== 对外导出（自测/调试用） ========== */
+  window.Tetris = {
+    Board: Board,
+    Tetromino: Tetromino,
+    Randomizer: Randomizer,
+    Scoring: Scoring,
+    Modes: Modes
+  };
+</script>
+
+<script id="tetris-shell">
+  /* ==========================================================================
+   * 外壳（渲染 / 输入 / 主循环；不持有规则数值，全部取自 CONST）
+   * 顺序：Input → Renderer → Bootstrap
+   * ========================================================================== */
+  /* ==========================================================================
+   * 外壳 · Input：键盘事件 -> intent（归一化），左右移动支持 DAS/ARR 自动重复
+   * ========================================================================== */
+  const Input = (function () {
+    let leftHeld = false, rightHeld = false;
+    let leftTimer = 0, rightTimer = 0;
+    let leftCharged = false, rightCharged = false;
+
+    function actionFor(code) {
+      const K = CONST.KEYS;
+      if (K.MOVE_LEFT.indexOf(code) >= 0) return 'left';
+      if (K.MOVE_RIGHT.indexOf(code) >= 0) return 'right';
+      if (K.ROTATE_CW.indexOf(code) >= 0) return 'rotateCW';
+      if (K.ROTATE_CCW.indexOf(code) >= 0) return 'rotateCCW';
+      if (K.SOFT_DROP.indexOf(code) >= 0) return 'softDrop';
+      if (K.HARD_DROP.indexOf(code) >= 0) return 'hardDrop';
+      if (K.HOLD.indexOf(code) >= 0) return 'hold';
+      return null;
+    }
+
+    function intentFor(action) {
+      if (action === 'left') return { type: 'move', dx: -1 };
+      if (action === 'right') return { type: 'move', dx: 1 };
+      if (action === 'rotateCW') return { type: 'rotate', dir: 1 };
+      if (action === 'rotateCCW') return { type: 'rotate', dir: -1 };
+      if (action === 'hardDrop') return { type: 'hardDrop' };
+      if (action === 'hold') return { type: 'hold' };
+      if (action === 'softDropOn') return { type: 'softDrop', on: true };
+      if (action === 'softDropOff') return { type: 'softDrop', on: false };
+      return null;
+    }
+
+    function handleDown(code, isRepeat) {
+      const action = actionFor(code);
+      if (!action) return null;
+
+      if (action === 'left' || action === 'right') {
+        if (isRepeat) return null; // 系统自动重复忽略：重复由 poll 按 DAS/ARR 驱动
+        if (action === 'left') { leftHeld = true; leftTimer = 0; leftCharged = false; }
+        else { rightHeld = true; rightTimer = 0; rightCharged = false; }
+        return intentFor(action);
+      }
+      if (isRepeat) return null; // 旋转/硬降/暂存只响应按下沿
+      if (action === 'softDrop') return intentFor('softDropOn');
+      return intentFor(action);
+    }
+
+    function handleUp(code) {
+      const action = actionFor(code);
+      if (action === 'left') { leftHeld = false; leftCharged = false; leftTimer = 0; }
+      else if (action === 'right') { rightHeld = false; rightCharged = false; rightTimer = 0; }
+      else if (action === 'softDrop') return intentFor('softDropOff');
+      return null;
+    }
+
+    function poll(dtMs) {
+      const out = [];
+      if (leftHeld) {
+        leftTimer += dtMs;
+        if (!leftCharged) {
+          if (leftTimer >= CONST.DAS_MS) { leftCharged = true; leftTimer = 0; out.push(intentFor('left')); }
+        } else {
+          while (leftTimer >= CONST.ARR_MS) { leftTimer -= CONST.ARR_MS; out.push(intentFor('left')); }
+        }
+      }
+      if (rightHeld) {
+        rightTimer += dtMs;
+        if (!rightCharged) {
+          if (rightTimer >= CONST.DAS_MS) { rightCharged = true; rightTimer = 0; out.push(intentFor('right')); }
+        } else {
+          while (rightTimer >= CONST.ARR_MS) { rightTimer -= CONST.ARR_MS; out.push(intentFor('right')); }
+        }
+      }
+      return out;
+    }
+
+    function reset() {
+      leftHeld = false; rightHeld = false;
+      leftTimer = 0; rightTimer = 0;
+      leftCharged = false; rightCharged = false;
+    }
+
+    return { actionFor: actionFor, handleDown: handleDown, handleUp: handleUp, poll: poll, reset: reset };
+  })();
+
+  /* ==========================================================================
+   * 外壳 · Renderer：把 state 渲染为像素（不修改 state）
+   * ========================================================================== */
+  const Renderer = (function () {
+    const CELL = CONST.CELL;
+    let ctxBoard = null, ctxNext = null, ctxHold = null;
+    let statsEls = null;
+
+    // 逻辑尺寸固定，按 devicePixelRatio 放大 backing store，保证高清屏不糊
+    function setup(canvas, cssW, cssH) {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(cssW * dpr);
+      canvas.height = Math.round(cssH * dpr);
+      canvas.style.width = cssW + 'px';
+      canvas.style.height = cssH + 'px';
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return ctx;
+    }
+
+    function attach(canvases) {
+      ctxBoard = setup(canvases.board, CONST.COLS * CELL, CONST.ROWS * CELL);
+      ctxNext = setup(canvases.next, 96, CONST.NEXT_COUNT * 64);
+      ctxHold = setup(canvases.hold, 96, 64);
+    }
+
+    function bindStats(els) { statsEls = els; }
+
+    function roundRect(ctx, px, py, size, radius) {
+      const r = Math.max(1, Math.min(radius, size / 2));
+      ctx.beginPath();
+      ctx.moveTo(px + r, py);
+      ctx.lineTo(px + size - r, py);
+      ctx.quadraticCurveTo(px + size, py, px + size, py + r);
+      ctx.lineTo(px + size, py + size - r);
+      ctx.quadraticCurveTo(px + size, py + size, px + size - r, py + size);
+      ctx.lineTo(px + r, py + size);
+      ctx.quadraticCurveTo(px, py + size, px, py + size - r);
+      ctx.lineTo(px, py + r);
+      ctx.quadraticCurveTo(px, py, px + r, py);
+      ctx.closePath();
+    }
+
+    function drawCell(ctx, px, py, size, color, alpha) {
+      const a = alpha === undefined ? 1 : alpha;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = color;
+      roundRect(ctx, px, py, size, Math.max(2, size * 0.18));
+      ctx.fill();
+      ctx.globalAlpha = a * 0.35;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(px + size * 0.18, py + size * 0.13, size * 0.64, size * 0.14);
+      ctx.globalAlpha = 1;
+    }
+
+    function drawGhostCell(ctx, px, py, size) {
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = CONST.GHOST_STROKE;
+      ctx.lineWidth = 2;
+      roundRect(ctx, px + 2, py + 2, size - 4, Math.max(2, (size - 4) * 0.18));
+      ctx.stroke();
+    }
+
+    // 方块在自身包围盒内的最小/最大行列，用于在槽位中居中
+    function boxOf(type, rot) {
+      const list = Tetromino.cells(type, rot);
+      let minX = 99, maxX = -99, minY = 99, maxY = -99;
+      list.forEach(function (c) {
+        if (c.x < minX) minX = c.x;
+        if (c.x > maxX) maxX = c.x;
+        if (c.y < minY) minY = c.y;
+        if (c.y > maxY) maxY = c.y;
+      });
+      return { minX: minX, minY: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+    }
+
+    function drawMini(ctx, type, size, boxW, boxH) {
+      ctx.clearRect(0, 0, boxW, boxH);
+      if (!type) return;
+      const box = boxOf(type, 0);
+      const ox = (boxW - box.w * size) / 2 - box.minX * size;
+      const oy = (boxH - box.h * size) / 2 - box.minY * size;
+      Tetromino.cells(type, 0).forEach(function (c) {
+        drawCell(ctx, ox + c.x * size, oy + c.y * size, size, CONST.COLORS[type]);
+      });
+    }
+
+    function drawNext(state) {
+      const size = 20;
+      const slotH = 64;
+      ctxNext.clearRect(0, 0, 96, CONST.NEXT_COUNT * slotH);
+      state.next.forEach(function (type, i) {
+        const box = boxOf(type, 0);
+        const ox = (96 - box.w * size) / 2 - box.minX * size;
+        const oy = i * slotH + (slotH - box.h * size) / 2 - box.minY * size;
+        Tetromino.cells(type, 0).forEach(function (c) {
+          drawCell(ctxNext, ox + c.x * size, oy + c.y * size, size, CONST.COLORS[type]);
+        });
+      });
+    }
+
+    function drawHold(state) {
+      drawMini(ctxHold, state.hold, 22, 96, 64);
+    }
+
+    function drawBoard(state) {
+      if (!state.board) return; // READY（未开局）时 board 为 null：无棋盘可绘，避免首帧抛错终止主循环
+      const W = CONST.COLS * CELL;
+      const H = CONST.ROWS * CELL;
+      ctxBoard.clearRect(0, 0, W, H);
+      ctxBoard.fillStyle = '#0b1020';
+      ctxBoard.fillRect(0, 0, W, H);
+
+      ctxBoard.strokeStyle = 'rgba(148, 163, 184, 0.12)';
+      ctxBoard.lineWidth = 1;
+      for (let c = 1; c < CONST.COLS; c++) {
+        ctxBoard.beginPath();
+        ctxBoard.moveTo(c * CELL, 0);
+        ctxBoard.lineTo(c * CELL, H);
+        ctxBoard.stroke();
+      }
+      for (let r = 1; r < CONST.ROWS; r++) {
+        ctxBoard.beginPath();
+        ctxBoard.moveTo(0, r * CELL);
+        ctxBoard.lineTo(W, r * CELL);
+        ctxBoard.stroke();
+      }
+
+      // 已固定方块（隐藏缓冲行不绘制；消行动画期间整行闪白）
+      const flash = state.clearing ? Math.min(1, state.clearing.timerMs / CONST.CLEAR_ANIM_MS) : 0;
+      for (let r = Board.HIDDEN_ROWS; r < Board.TOTAL_ROWS; r++) {
+        const dr = r - Board.HIDDEN_ROWS;
+        for (let c = 0; c < CONST.COLS; c++) {
+          const t = state.board[r][c];
+          if (!t) continue;
+          const isFlashing = flash > 0 && state.clearing.rows.indexOf(r) >= 0;
+          drawCell(ctxBoard, c * CELL + 1, dr * CELL + 1, CELL - 2, isFlashing ? '#f8fafc' : CONST.COLORS[t]);
+        }
+      }
+
+      const p = state.piece;
+      if (!p) return;
+
+      // 幽灵块：当前姿态的硬降落点
+      const gy = GameState.ghostY(state);
+      if (gy !== p.y) {
+        Tetromino.cells(p.type, p.rot).forEach(function (c) {
+          const cy = gy + c.y - Board.HIDDEN_ROWS;
+          if (cy < 0) return;
+          drawGhostCell(ctxBoard, (p.x + c.x) * CELL + 1, cy * CELL + 1, CELL - 2);
+        });
+      }
+      // 当前方块
+      Tetromino.cells(p.type, p.rot).forEach(function (c) {
+        const cy = p.y + c.y - Board.HIDDEN_ROWS;
+        if (cy < 0) return; // 仍在隐藏缓冲区，不绘制
+        drawCell(ctxBoard, (p.x + c.x) * CELL + 1, cy * CELL + 1, CELL - 2, CONST.COLORS[p.type]);
+      });
+    }
+
+    function drawStats(state) {
+      if (!statsEls) return;
+      statsEls.score.textContent = String(state.score);
+      statsEls.level.textContent = String(state.level);
+      statsEls.lines.textContent = String(state.lines);
+      statsEls.progressLabel.textContent = state.mode.progressLabel;
+      statsEls.progress.textContent = state.mode.progressText(state);
+    }
+
+    function draw(state) {
+      drawBoard(state);
+      drawNext(state);
+      drawHold(state);
+      drawStats(state);
+    }
+
+    return { attach: attach, bindStats: bindStats, setup: setup, draw: draw, drawMini: drawMini };
+  })();
+
+  /* ==========================================================================
+   * 外壳 · Bootstrap：主循环、事件绑定、面板交互
+   * ========================================================================== */
+  (function bootstrap() {
+    const boardCanvas = document.getElementById('board');
+    const nextCanvas = document.getElementById('next');
+    const holdCanvas = document.getElementById('hold');
+    const overlay = document.getElementById('overlay');
+    const el = {
+      title: document.getElementById('overlay-title'),
+      sub: document.getElementById('overlay-sub'),
+      modes: document.getElementById('mode-list'),
+      levels: document.getElementById('level-list'),
+      score: document.getElementById('score'),
+      level: document.getElementById('level'),
+      lines: document.getElementById('lines'),
+      progressLabel: document.getElementById('progress-label'),
+      progress: document.getElementById('progress')
+    };
+
+    // 所有游戏内按键：统一 preventDefault，避免方向键/空格滚动页面
+    const ALL_CODES = Object.keys(CONST.KEYS).reduce(function (acc, key) {
+      return acc.concat(CONST.KEYS[key]);
+    }, []);
+
+    const state = GameState.create();
+    const ui = {
+      modeIndex: 0,
+      startLevel: CONST.START_LEVEL_MIN,
+      bestScore: 0, // 仅当前会话内存：不做持久化，刷新即清零
+      lastStatus: GameState.STATUS.READY
+    };
+    let lastTs = 0;
+
+    function layout() {
+      Renderer.attach({ board: boardCanvas, next: nextCanvas, hold: holdCanvas });
+    }
+
+    function buildChoices() {
+      Modes.list.forEach(function (mode, i) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'choice';
+        btn.textContent = mode.label + '（' + mode.goal + '）';
+        btn.addEventListener('click', function () {
+          ui.modeIndex = i;
+          syncOverlay();
+          btn.blur();
+        });
+        el.modes.appendChild(btn);
+      });
+      for (let lv = CONST.START_LEVEL_MIN; lv <= CONST.START_LEVEL_MAX; lv++) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'choice';
+        btn.dataset.level = String(lv);
+        btn.textContent = 'Lv ' + lv;
+        btn.addEventListener('click', function () {
+          ui.startLevel = lv;
+          syncOverlay();
+          btn.blur();
+        });
+        el.levels.appendChild(btn);
+      }
+    }
+
+    function syncOverlay() {
+      const status = state.status;
+      const ready = status === GameState.STATUS.READY;
+
+      overlay.classList.toggle('hidden', status === GameState.STATUS.PLAYING);
+      el.modes.classList.toggle('hidden', !ready);
+      el.levels.classList.toggle('hidden', !ready);
+
+      Array.prototype.forEach.call(el.modes.children, function (btn, i) {
+        btn.classList.toggle('active', i === ui.modeIndex);
+      });
+      Array.prototype.forEach.call(el.levels.children, function (btn) {
+        btn.classList.toggle('active', Number(btn.dataset.level) === ui.startLevel);
+      });
+
+      if (ready) {
+        el.title.textContent = '俄罗斯方块';
+        el.sub.textContent = '选择模式与起始等级，按 Enter 开始';
+      } else if (status === GameState.STATUS.PAUSED) {
+        el.title.textContent = '已暂停';
+        el.sub.textContent = '按 P 继续';
+      } else if (status === GameState.STATUS.GAME_OVER) {
+        el.title.textContent = state.topOut ? '本局结束 · ' + state.message : '目标达成';
+        el.sub.textContent = state.mode.resultText(state) + '\n本会话最佳：' + ui.bestScore + '（按 Enter 返回选择）';
+      }
+    }
+
+    function startGame() {
+      GameState.start(state, Modes.list[ui.modeIndex].id, ui.startLevel);
+      syncOverlay();
+    }
+
+    function onEnter() {
+      if (state.status === GameState.STATUS.READY) startGame();
+      else if (state.status === GameState.STATUS.GAME_OVER) {
+        GameState.toReady(state);
+        syncOverlay();
+      }
+    }
+
+    // READY 面板：← → 选模式，↑ ↓ 选起始等级
+    function onReadyNavigation(code) {
+      if (code === CONST.KEYS.MOVE_LEFT[0]) {
+        ui.modeIndex = (ui.modeIndex + Modes.list.length - 1) % Modes.list.length;
+      } else if (code === CONST.KEYS.MOVE_RIGHT[0]) {
+        ui.modeIndex = (ui.modeIndex + 1) % Modes.list.length;
+      } else if (code === CONST.KEYS.ROTATE_CW[0]) {
+        ui.startLevel = Math.min(CONST.START_LEVEL_MAX, ui.startLevel + 1);
+      } else if (code === CONST.KEYS.SOFT_DROP[0]) {
+        ui.startLevel = Math.max(CONST.START_LEVEL_MIN, ui.startLevel - 1);
+      } else {
+        return false;
+      }
+      syncOverlay();
+      return true;
+    }
+
+    function onKeyDown(e) {
+      const code = e.code;
+      if (ALL_CODES.indexOf(code) >= 0) e.preventDefault();
+      const isRepeat = e.repeat === true;
+
+      if (code === CONST.KEYS.START[0]) { // Enter：开始 / 重开
+        if (!isRepeat) onEnter();
+        return;
+      }
+      if (state.status === GameState.STATUS.READY) {
+        if (!isRepeat) onReadyNavigation(code);
+        return;
+      }
+      if (code === CONST.KEYS.PAUSE[0] || code === CONST.KEYS.PAUSE[1]) {
+        if (isRepeat) return;
+        if (state.status === GameState.STATUS.GAME_OVER) {
+          GameState.toReady(state);
+          syncOverlay();
+          return;
+        }
+        GameState.applyIntent(state, { type: 'pause' });
+        syncOverlay();
+        return;
+      }
+      const intent = Input.handleDown(code, isRepeat);
+      if (intent) GameState.applyIntent(state, intent);
+    }
+
+    function onKeyUp(e) {
+      const intent = Input.handleUp(e.code);
+      if (intent) GameState.applyIntent(state, intent);
+    }
+
+    // 失焦 / 切后台：清空按键并自动暂停，避免“卡住一直往下掉”
+    function autoPause() {
+      Input.reset();
+      if (state.status === GameState.STATUS.PLAYING) {
+        GameState.applyIntent(state, { type: 'pause' });
+        syncOverlay();
+      }
+      lastTs = 0; // 恢复后重新起算，配合 dt 钳制杜绝瞬间掉落
+    }
+
+    function loop(ts) {
+      const dt = lastTs === 0 ? 0 : ts - lastTs;
+      lastTs = ts;
+
+      const intents = Input.poll(dt);
+      for (let i = 0; i < intents.length; i++) GameState.applyIntent(state, intents[i]);
+      GameState.update(state, dt);
+      Renderer.draw(state);
+
+      if (state.status !== ui.lastStatus) {
+        if (state.status === GameState.STATUS.GAME_OVER && state.score > ui.bestScore) {
+          ui.bestScore = state.score;
+        }
+        syncOverlay();
+        ui.lastStatus = state.status;
+      }
+      requestAnimationFrame(loop);
+    }
+
+    buildChoices();
+    layout();
+    Renderer.bindStats(el);
+    syncOverlay();
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', autoPause);
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) autoPause();
+    });
+    window.addEventListener('resize', function () {
+      layout(); // 重算画布 backing store，避免模糊/错位
+    });
+
+    requestAnimationFrame(loop);
+  })();
+</script>
+</body>
+</html>
