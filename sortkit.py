@@ -5,7 +5,7 @@ sortkit 排序算法工具库
 提供对同类型可比较元素的通用排序能力，支持原地排序与返回有序结果。
 
 - 统一入口：sort(data, algorithm='quick', reverse=False)
-- 算法实现：冒泡（标准/优化）、快速（默认，三数取中 + 小规模切插入排序）、归并（稳定）
+- 算法实现：冒泡（标准/优化）、快速（默认，三数取中 + 三向分区 + 小规模切插入排序）、归并（稳定）
 - 异常体系：SortError -> InvalidInputError / NotComparableError
 
 纯内存计算：无外部依赖、无持久化、无 I/O。
@@ -15,7 +15,7 @@ sortkit 排序算法工具库
 """
 
 from functools import total_ordering
-from typing import List, TypeVar
+from typing import List, Tuple, TypeVar
 
 T = TypeVar("T")
 
@@ -108,7 +108,7 @@ def bubble_sort_optimized(data: List[T]) -> List[T]:
 
 def quick_sort(data: List[T]) -> List[T]:
     """
-    快速排序（默认算法）：三数取中选枢轴 + 分区递归，小规模切插入排序。
+    快速排序（默认算法）：三数取中选枢轴 + 三向分区，小规模切插入排序。
 
     平均 O(n log n)，空间 O(log n) 栈，不稳定。
 
@@ -125,19 +125,29 @@ def quick_sort(data: List[T]) -> List[T]:
 
 
 def _quick_sort_range(data: List[T], low: int, high: int) -> None:
-    """对 data[low..high] 区间递归快速排序。"""
-    # 小规模子区切换插入排序，降低递归开销
-    if high - low + 1 <= INSERTION_THRESHOLD:
-        _insertion_sort(data, low, high)
-        return
-    if low < high:
-        pivot_index = _partition(data, low, high)
-        _quick_sort_range(data, low, pivot_index - 1)
-        _quick_sort_range(data, pivot_index + 1, high)
+    """对 data[low..high] 区间快速排序：仅递归较小分区，较大分区转迭代以控制栈深。"""
+    while low < high:
+        # 小规模子区切换插入排序，降低递归开销
+        if high - low + 1 <= INSERTION_THRESHOLD:
+            _insertion_sort(data, low, high)
+            return
+        lt, gt = _partition(data, low, high)
+        # 相等区 [lt, gt] 已就位，仅需处理两侧；递归较小一侧，循环处理较大一侧
+        if lt - low < high - gt:
+            _quick_sort_range(data, low, lt - 1)
+            low = gt + 1
+        else:
+            _quick_sort_range(data, gt + 1, high)
+            high = lt - 1
 
 
-def _partition(data: List[T], low: int, high: int) -> int:
-    """Lomuto 分区，三数取中（首/中/尾）选枢轴，返回枢轴最终位置。"""
+def _partition(data: List[T], low: int, high: int) -> Tuple[int, int]:
+    """
+    三向分区（< 枢轴 / == 枢轴 / > 枢轴），三数取中（首/中/尾）选枢轴。
+
+    Returns:
+        相等区间的左右边界 (lt, gt)
+    """
     mid = (low + high) // 2
     # 三数取中：将首/中/尾排序，使中位数（data[mid]）为枢轴，规避已序/近序退化
     if data[mid] < data[low]:
@@ -147,16 +157,21 @@ def _partition(data: List[T], low: int, high: int) -> int:
     if data[high] < data[mid]:
         data[mid], data[high] = data[high], data[mid]
     pivot = data[mid]
-    # 将枢轴移到区间末尾，随后对 [low, high-1] 完整分区
-    data[mid], data[high] = data[high], data[mid]
+    # 三向扫描：lt 左侧全部小于枢轴，gt 右侧全部大于枢轴，[lt, gt] 为相等区
+    lt = low
     i = low
-    for j in range(low, high):
-        if data[j] < pivot:
-            data[i], data[j] = data[j], data[i]
+    gt = high
+    while i <= gt:
+        if data[i] < pivot:
+            data[lt], data[i] = data[i], data[lt]
+            lt += 1
             i += 1
-    # 将枢轴归位到 i 处
-    data[i], data[high] = data[high], data[i]
-    return i
+        elif pivot < data[i]:
+            data[i], data[gt] = data[gt], data[i]
+            gt -= 1
+        else:
+            i += 1
+    return lt, gt
 
 
 def _insertion_sort(data: List[T], low: int, high: int) -> None:
