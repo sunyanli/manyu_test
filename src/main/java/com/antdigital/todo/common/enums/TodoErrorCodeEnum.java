@@ -32,7 +32,7 @@ public enum TodoErrorCodeEnum {
     ITEM_DESC_TOO_LONG("TODO_0004", "事项描述不能超过 512 个字符"),
 
     /**
-     * 未登录或登录态失效
+     * 未登录或登录态失效，含网关签名缺失/校验失败
      */
     NOT_LOGIN("TODO_0005", "登录态已失效，请重新登录"),
 
@@ -54,7 +54,17 @@ public enum TodoErrorCodeEnum {
     /**
      * 请求过于频繁（限流）
      */
-    RATE_LIMITED("TODO_0009", "操作过于频繁，请稍后重试");
+    RATE_LIMITED("TODO_0009", "操作过于频繁，请稍后重试"),
+
+    /**
+     * 创建功能未开放：总开关关闭或租户未命中灰度（系分 §7.2/§7.3）
+     */
+    FEATURE_DISABLED("TODO_0010", "功能维护中，请稍后重试"),
+
+    /**
+     * 未预期异常（非存储类）：与 TODO_0008 区分，避免排障与重试语义混淆
+     */
+    UNKNOWN_ERROR("TODO_0011", "系统繁忙，请稍后重试");
 
     /**
      * 错误码
@@ -87,5 +97,20 @@ public enum TodoErrorCodeEnum {
      */
     public String getMsg() {
         return msg;
+    }
+
+    /**
+     * 按错误码字符串反查枚举。
+     *
+     * @param code 错误码字符串
+     * @return 对应枚举；无法匹配时返回 {@link #UNKNOWN_ERROR}
+     */
+    public static TodoErrorCodeEnum of(String code) {
+        for (TodoErrorCodeEnum errorCode : values()) {
+            if (errorCode.code.equals(code)) {
+                return errorCode;
+            }
+        }
+        return UNKNOWN_ERROR;
     }
 }

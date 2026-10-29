@@ -20,4 +20,13 @@ public interface TodoSequenceProvider {
      * @return 正整数序号，重复或回绕不视为错误
      */
     long nextSequence(String dateKey);
+
+    /**
+     * 当前实现是否为降级路径，用于上报 {@code todo_no_degrade_total}（系分 §6.5）。
+     *
+     * @return true 表示本次取号来自降级实现
+     */
+    default boolean isDegraded() {
+        return false;
+    }
 }

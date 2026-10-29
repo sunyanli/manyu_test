@@ -37,12 +37,17 @@ com.antdigital.todo
 
 ## 3. 关键约束
 
-- **身份可信**：`creatorId/creatorName/tenantId` 只取网关注入请求头，请求体中的同名字段一律忽略。
-- **幂等**：`uk_todo_item_req(tenant_id, request_id)` 唯一索引为最终防线，冲突后重查返回首次结果。
+- **身份可信**：`creatorId/creatorName/tenantId` 只取网关注入的**签名请求头**（HMAC-SHA256），
+  请求体中的同名字段一律忽略；签名缺失/校验失败/租户缺失一律 TODO_0005，密钥未配置时 fail-closed。
+- **幂等**：`uk_todo_item_req(tenant_id, request_id)` 唯一索引为最终防线；冲突后**先**按幂等键加锁重查
+  返回首次结果（不依赖数据库错误文案解析），确认为编号冲突才重新取号重试。
 - **编号**：`TD + yyyyMMdd + 6 位序号`，取号能力通过 `TodoSequenceProvider` 抽象，默认雪花实现，`uk_todo_item_no` 兜底。
-- **弱依赖降级**：审计投递失败、取号降级均不阻断创建；登录态校验为强依赖，失败即快速失败。
-- **错误码**：`TODO_0001~TODO_0009` 与系分错误码表一一对应，由 `TodoErrorCodeEnum` 唯一维护。
+- **可运维**：`todo.create.enabled` 总开关 + `todo.create.gray.tenants` 租户尾号灰度（§7.2/§7.3），
+  `/actuator/prometheus` 暴露 `todo_create_*` 等指标支撑 §6.5 告警。
+- **弱依赖降级**：审计投递失败（事务提交后投递）、取号降级均不阻断创建，且均计入指标；登录态校验为强依赖，失败即快速失败。
+- **错误码**：`TODO_0001~TODO_0011` 由 `TodoErrorCodeEnum` 唯一维护；`TODO_0010` 功能未开放、`TODO_0011` 未预期异常。
 - **日志安全**：事项名称/描述原文不落日志，`TodoItemDO#toString` 与审计事件均做脱敏/隐藏。
+- **时区**：`gmt_create`/编号日期段统一按 `Asia/Shanghai` 计算，不依赖 JVM 默认时区。
 
 ## 4. 模块文档索引
 

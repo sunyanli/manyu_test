@@ -364,7 +364,7 @@ erDiagram
 | code | String | 结果码，`OK` 表示成功 |
 | msg | String | 提示信息，成功为 `SUCCESS` |
 | data | Object | 业务数据 |
-| data.id | Long | 待办主键 ID |
+| data.id | String | 待办主键 ID（以 String 返回，规避前端 Number 精度丢失；与实现一致） |
 | data.todoNo | String | 待办展示编号，如 TD20261029000001 |
 | data.itemName | String | 事项名称（服务端规范化后的值） |
 | data.itemDesc | String | 事项描述（服务端规范化后的值） |
@@ -386,6 +386,8 @@ erDiagram
 | TODO_0007 | 待办编号生成冲突（重试一次仍冲突） |
 | TODO_0008 | 存储异常，创建失败，请重试 |
 | TODO_0009 | 请求过于频繁（限流） |
+| TODO_0010 | 功能未开放（`todo.create.enabled` 关闭或租户未命中灰度） |
+| TODO_0011 | 未预期异常（与 TODO_0008 存储异常区分，便于排障） |
 
 - **业务规则**: 名称必填且规范化后非空；身份字段只信任网关注入；创建后状态固定 0；同 `requestId` 幂等返回；描述不做 HTML 转义存储（纯文本，展示端负责转义）。
 - **请求示例**:

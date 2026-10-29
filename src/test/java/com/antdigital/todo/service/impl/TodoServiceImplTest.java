@@ -10,9 +10,12 @@ import com.antdigital.todo.integration.AuditIntegration;
 import com.antdigital.todo.model.dto.OperatorContext;
 import com.antdigital.todo.model.dto.TodoCreateRequest;
 import com.antdigital.todo.model.dto.TodoCreateResult;
+import com.antdigital.todo.service.component.TodoCreateGate;
+import com.antdigital.todo.service.component.TodoMetrics;
 import com.antdigital.todo.service.component.TodoNoGenerator;
 import com.antdigital.todo.service.component.TodoRateLimiter;
 import com.antdigital.todo.service.component.TodoValidator;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,8 +35,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * {@link TodoServiceImpl} 创建链路单元测试。
  *
- * <p>覆盖正常创建、幂等命中、并发唯一键冲突、编号冲突重试与耗尽、存储异常、权限与登录态、
- * 限流以及审计降级场景。依赖均为手写替身，不引入额外 Mock 框架，保持与项目现有测试技术栈一致。
+ * <p>覆盖正常创建、幂等命中、并发唯一键冲突（含索引名不可识别）、编号冲突重试与耗尽、
+ * 存储异常、权限与登录态、功能开关与灰度、限流以及审计降级场景。依赖均为手写替身，
+ * 指标使用 {@link SimpleMeterRegistry}，不引入额外 Mock 框架。
  *
  * @author AiWork
  * @date 2026/10/29
@@ -58,6 +62,8 @@ class TodoServiceImplTest {
 
     private TodoRateLimiter todoRateLimiter;
 
+    private SimpleMeterRegistry meterRegistry;
+
     private TodoServiceImpl todoService;
 
     @BeforeEach
@@ -66,8 +72,8 @@ class TodoServiceImplTest {
         todoNoGenerator = new FakeTodoNoGenerator();
         auditIntegration = new FakeAuditIntegration();
         todoRateLimiter = new TodoRateLimiter(100, () -> 1_000L);
-        todoService = new TodoServiceImpl(new TodoItemManager(todoItemMapper), new TodoValidator(),
-                todoNoGenerator, todoRateLimiter, auditIntegration);
+        meterRegistry = new SimpleMeterRegistry();
+        todoService = buildService(new TodoCreateGate(true, ""));
     }
 
     // ==================== createTodo 测试 ====================
@@ -116,6 +122,21 @@ class TodoServiceImplTest {
     }
 
     @Test
+    @DisplayName("指标埋点：成功创建上报 todo_create_total{code=OK} 与耗时")
+    void should_recordCreateMetrics_when_createSuccess() {
+        // Arrange
+        OperatorContext operator = buildOperator(Collections.singletonList("TODO_CREATE"));
+        todoNoGenerator.enqueue(TODO_NO);
+
+        // Act
+        todoService.createTodo(buildRequest(REQUEST_ID, "整理周报", null), operator);
+
+        // Assert
+        assertThat(meterRegistry.get("todo_create_total").tag("code", "OK").counter().count()).isEqualTo(1.0D);
+        assertThat(meterRegistry.get("todo_create_cost_ms").summary().count()).isEqualTo(1L);
+    }
+
+    @Test
     @DisplayName("幂等命中：同一 requestId 重复提交返回首次结果")
     void should_returnFirstResult_when_sameRequestIdSubmittedTwice() {
         // Arrange
@@ -131,6 +152,7 @@ class TodoServiceImplTest {
         assertThat(second.isIdempotent()).isTrue();
         assertThat(todoItemMapper.insertCount).isEqualTo(1);
         assertThat(todoItemMapper.size()).isEqualTo(1);
+        assertThat(meterRegistry.get("todo_create_idempotent_hit_total").counter().count()).isEqualTo(1.0D);
     }
 
     @Test
@@ -151,6 +173,44 @@ class TodoServiceImplTest {
         assertThat(result.isIdempotent()).isTrue();
         assertThat(result.getTodoNo()).isEqualTo(TODO_NO);
         assertThat(todoItemMapper.size()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("并发重复提交：索引名不可识别时仍返回首次结果而非 TODO_0007")
+    void should_returnFirstResult_when_duplicateRequestIdRaceAndConstraintUnknown() {
+        // Arrange
+        OperatorContext operator = buildOperator(Collections.singletonList("TODO_CREATE"));
+        todoItemMapper.seed(buildExisting(TODO_NO, REQUEST_ID));
+        todoItemMapper.missSelectOnce = true;
+        todoItemMapper.unknownConstraint = true;
+        todoNoGenerator.enqueue("TD20261029000099");
+
+        // Act
+        TodoCreateResult result = todoService.createTodo(buildRequest(REQUEST_ID, "整理周报", null), operator);
+
+        // Assert
+        assertThat(result.isIdempotent()).isTrue();
+        assertThat(result.getTodoNo()).isEqualTo(TODO_NO);
+        assertThat(todoItemMapper.insertCount).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("跨租户隔离：其他租户的 requestId 不产生幂等命中")
+    void should_createNewTodo_when_sameRequestIdInOtherTenant() {
+        // Arrange
+        TodoItemDO otherTenant = buildExisting(TODO_NO, REQUEST_ID);
+        otherTenant.setTenantId("9");
+        todoItemMapper.seed(otherTenant);
+        todoNoGenerator.enqueue("TD20261029000002");
+        OperatorContext operator = buildOperator(Collections.singletonList("TODO_CREATE"));
+
+        // Act
+        TodoCreateResult result = todoService.createTodo(buildRequest(REQUEST_ID, "整理周报", null), operator);
+
+        // Assert
+        assertThat(result.isIdempotent()).isFalse();
+        assertThat(result.getTodoNo()).isEqualTo("TD20261029000002");
+        assertThat(todoItemMapper.size()).isEqualTo(2);
     }
 
     @Test
@@ -202,6 +262,53 @@ class TodoServiceImplTest {
         assertThatThrownBy(() -> todoService.createTodo(request, operator))
                 .isInstanceOfSatisfying(TodoBizException.class,
                         e -> assertThat(e.getCode()).isEqualTo(TodoErrorCodeEnum.STORAGE_ERROR.getCode()));
+        assertThat(meterRegistry.get("todo_create_total").tag("code", "TODO_0008").counter().count())
+                .isEqualTo(1.0D);
+    }
+
+    @Test
+    @DisplayName("功能开关：总开关关闭时返回 TODO_0010 且不落库")
+    void should_throwFeatureDisabled_when_switchOff() {
+        // Arrange
+        todoService = buildService(new TodoCreateGate(false, ""));
+        OperatorContext operator = buildOperator(Collections.singletonList("TODO_CREATE"));
+        TodoCreateRequest request = buildRequest(REQUEST_ID, "整理周报", null);
+
+        // Act & Assert
+        assertThatThrownBy(() -> todoService.createTodo(request, operator))
+                .isInstanceOfSatisfying(TodoBizException.class,
+                        e -> assertThat(e.getCode()).isEqualTo(TodoErrorCodeEnum.FEATURE_DISABLED.getCode()));
+        assertThat(todoItemMapper.insertCount).isZero();
+    }
+
+    @Test
+    @DisplayName("灰度：租户尾号未命中白名单时返回 TODO_0010")
+    void should_throwFeatureDisabled_when_tenantNotInGrayScope() {
+        // Arrange
+        todoService = buildService(new TodoCreateGate(true, "7,8"));
+        OperatorContext operator = buildOperator(Collections.singletonList("TODO_CREATE"));
+        TodoCreateRequest request = buildRequest(REQUEST_ID, "整理周报", null);
+
+        // Act & Assert
+        assertThatThrownBy(() -> todoService.createTodo(request, operator))
+                .isInstanceOfSatisfying(TodoBizException.class,
+                        e -> assertThat(e.getCode()).isEqualTo(TodoErrorCodeEnum.FEATURE_DISABLED.getCode()));
+        assertThat(todoItemMapper.insertCount).isZero();
+    }
+
+    @Test
+    @DisplayName("灰度：租户尾号命中白名单时可创建")
+    void should_allowCreate_when_tenantInGrayScope() {
+        // Arrange
+        todoService = buildService(new TodoCreateGate(true, "0,1"));
+        OperatorContext operator = buildOperator(Collections.singletonList("TODO_CREATE"));
+        todoNoGenerator.enqueue(TODO_NO);
+
+        // Act
+        TodoCreateResult result = todoService.createTodo(buildRequest(REQUEST_ID, "整理周报", null), operator);
+
+        // Assert
+        assertThat(result.getTodoNo()).isEqualTo(TODO_NO);
     }
 
     @Test
@@ -259,6 +366,20 @@ class TodoServiceImplTest {
     }
 
     @Test
+    @DisplayName("登录态校验：租户标识缺失时返回 TODO_0005（不再回落默认租户）")
+    void should_throwNotLogin_when_tenantIdBlank() {
+        // Arrange
+        OperatorContext operator = new OperatorContext(USER_ID, USER_NAME, " ",
+                Collections.singletonList("TODO_CREATE"));
+        TodoCreateRequest request = buildRequest(REQUEST_ID, "整理周报", null);
+
+        // Act & Assert
+        assertThatThrownBy(() -> todoService.createTodo(request, operator))
+                .isInstanceOfSatisfying(TodoBizException.class,
+                        e -> assertThat(e.getCode()).isEqualTo(TodoErrorCodeEnum.NOT_LOGIN.getCode()));
+    }
+
+    @Test
     @DisplayName("入参校验：名称仅含空白字符时返回 TODO_0002")
     void should_throwItemNameRequired_when_nameIsBlank() {
         // Arrange
@@ -276,8 +397,7 @@ class TodoServiceImplTest {
     void should_throwRateLimited_when_exceedsLimit() {
         // Arrange
         todoRateLimiter = new TodoRateLimiter(1, () -> 1_000L);
-        todoService = new TodoServiceImpl(new TodoItemManager(todoItemMapper), new TodoValidator(),
-                todoNoGenerator, todoRateLimiter, auditIntegration);
+        todoService = buildService(new TodoCreateGate(true, ""));
         OperatorContext operator = buildOperator(Collections.singletonList("TODO_CREATE"));
         todoNoGenerator.enqueue(TODO_NO);
         todoNoGenerator.enqueue("TD20261029000002");
@@ -288,6 +408,7 @@ class TodoServiceImplTest {
         assertThatThrownBy(() -> todoService.createTodo(secondRequest, operator))
                 .isInstanceOfSatisfying(TodoBizException.class,
                         e -> assertThat(e.getCode()).isEqualTo(TodoErrorCodeEnum.RATE_LIMITED.getCode()));
+        assertThat(meterRegistry.get("todo_create_rate_limited_total").counter().count()).isEqualTo(1.0D);
     }
 
     @Test
@@ -305,6 +426,7 @@ class TodoServiceImplTest {
         assertThat(result.getTodoNo()).isEqualTo(TODO_NO);
         assertThat(todoItemMapper.size()).isEqualTo(1);
         assertThat(auditIntegration.invokeCount).isEqualTo(1);
+        assertThat(meterRegistry.get("todo_audit_degrade_total").counter().count()).isEqualTo(1.0D);
     }
 
     // ==================== queryByRequestId 测试 ====================
@@ -352,6 +474,11 @@ class TodoServiceImplTest {
 
     // ==================== 测试数据构造 ====================
 
+    private TodoServiceImpl buildService(TodoCreateGate gate) {
+        return new TodoServiceImpl(new TodoItemManager(todoItemMapper), new TodoValidator(),
+                todoNoGenerator, todoRateLimiter, auditIntegration, gate, new TodoMetrics(meterRegistry));
+    }
+
     private TodoCreateRequest buildRequest(String requestId, String itemName, String itemDesc) {
         TodoCreateRequest request = new TodoCreateRequest();
         request.setRequestId(requestId);
@@ -360,8 +487,8 @@ class TodoServiceImplTest {
         return request;
     }
 
-    private OperatorContext buildOperator(List<String> roles) {
-        return new OperatorContext(USER_ID, USER_NAME, TENANT_ID, roles);
+    private OperatorContext buildOperator(List<String> permissions) {
+        return new OperatorContext(USER_ID, USER_NAME, TENANT_ID, permissions);
     }
 
     private TodoItemDO buildExisting(String todoNo, String requestId) {
@@ -397,12 +524,19 @@ class TodoServiceImplTest {
 
         private boolean missSelectOnce;
 
+        private boolean unknownConstraint;
+
         @Override
         public TodoItemDO selectByRequestId(TodoItemDO query) {
             if (missSelectOnce) {
                 missSelectOnce = false;
                 return null;
             }
+            return store.get(query.getTenantId() + "|" + query.getRequestId());
+        }
+
+        @Override
+        public TodoItemDO selectByRequestIdForUpdate(TodoItemDO query) {
             return store.get(query.getTenantId() + "|" + query.getRequestId());
         }
 
@@ -415,7 +549,7 @@ class TodoServiceImplTest {
             String requestKey = todoItem.getTenantId() + "|" + todoItem.getRequestId();
             if (store.containsKey(requestKey)) {
                 throw new DuplicateKeyException("Duplicate entry for key '"
-                        + TodoDuplicateKeyException.UK_REQUEST_ID + "'");
+                        + (unknownConstraint ? "unknown_uk" : TodoDuplicateKeyException.UK_REQUEST_ID) + "'");
             }
             for (TodoItemDO item : store.values()) {
                 if (item.getTodoNo().equals(todoItem.getTodoNo())) {

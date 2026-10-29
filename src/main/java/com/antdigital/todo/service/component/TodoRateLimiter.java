@@ -3,6 +3,8 @@ package com.antdigital.todo.service.component;
 import com.antdigital.todo.common.constant.TodoConstants;
 import com.antdigital.todo.common.enums.TodoErrorCodeEnum;
 import com.antdigital.todo.common.exception.TodoBizException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayDeque;
@@ -13,10 +15,12 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 
 /**
- * 单用户创建频率限制器（R11）：本地滑动窗口计数，默认 30 次/分钟。
+ * 单用户创建频率限制器（R11）：本地滑动窗口计数，默认 30 次/分钟，阈值可由配置项覆盖。
  *
- * <p>说明：本地限流为单实例口径，网关联调时再叠加网关侧全局限流；
- * 窗口内时间戳队列按访问裁剪，因此无需定时清理线程。
+ * <p>口径说明：本实现为**单实例**限流，多副本部署时单用户实际额度约为阈值 × 副本数，
+ * 集群级限额由网关层限流保证（系分 §6.3「本地 + 网关双层」），详见
+ * {@code docs/modules/todo/README.md}。窗口内时间戳队列按访问裁剪，并对空闲用户条目做
+ * 阈值触发的整体回收，避免用户维度 Map 无界增长。
  *
  * @author AiWork
  * @date 2026/10/29
@@ -40,10 +44,13 @@ public class TodoRateLimiter {
     private final Map<String, Deque<Long>> timestamps = new ConcurrentHashMap<>();
 
     /**
-     * 默认构造：30 次/分钟，系统时钟。
+     * 生产构造：阈值取自配置项 {@code todo.create.rate-limit-per-minute}。
+     *
+     * @param limitPerMinute 每分钟上限
      */
-    public TodoRateLimiter() {
-        this(TodoConstants.DEFAULT_RATE_LIMIT_PER_MINUTE, System::currentTimeMillis);
+    @Autowired
+    public TodoRateLimiter(@Value("${todo.create.rate-limit-per-minute:30}") int limitPerMinute) {
+        this(limitPerMinute, System::currentTimeMillis);
     }
 
     /**
@@ -65,6 +72,7 @@ public class TodoRateLimiter {
      */
     public void acquire(String userId) {
         long now = clock.getAsLong();
+        evictIdleUsers(now);
         Deque<Long> queue = timestamps.computeIfAbsent(userId, key -> new ArrayDeque<>());
         synchronized (queue) {
             evictExpired(queue, now);
@@ -72,6 +80,26 @@ public class TodoRateLimiter {
                 throw new TodoBizException(TodoErrorCodeEnum.RATE_LIMITED);
             }
             queue.addLast(now);
+        }
+    }
+
+    /**
+     * 回收已完全滑出窗口的用户条目：仅在用户数超过阈值时触发，避免每次请求全量遍历。
+     *
+     * @param now 当前毫秒
+     */
+    private void evictIdleUsers(long now) {
+        if (timestamps.size() < TodoConstants.RATE_LIMIT_IDLE_SCAN_THRESHOLD) {
+            return;
+        }
+        for (Map.Entry<String, Deque<Long>> entry : timestamps.entrySet()) {
+            Deque<Long> queue = entry.getValue();
+            synchronized (queue) {
+                evictExpired(queue, now);
+                if (queue.isEmpty()) {
+                    timestamps.remove(entry.getKey(), queue);
+                }
+            }
         }
     }
 

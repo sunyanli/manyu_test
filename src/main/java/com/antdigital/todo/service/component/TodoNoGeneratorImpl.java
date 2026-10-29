@@ -13,7 +13,8 @@ import java.util.function.Supplier;
  *
  * <p>取号能力通过 {@link TodoSequenceProvider} 注入，默认使用本地雪花序号（零外部依赖）；
  * 生产环境可替换为 Redis INCR 实现。序号按 6 位取模补零，重复时由唯一索引兜底、
- * 调用方重试。
+ * 调用方重试。日期取业务时区 {@link TodoConstants#BIZ_ZONE}，不依赖 JVM 默认时区；
+ * 走降级实现时上报 {@code todo_no_degrade_total}。
  *
  * @author AiWork
  * @date 2026/10/29
@@ -33,28 +34,37 @@ public class TodoNoGeneratorImpl implements TodoNoGenerator {
     private final TodoSequenceProvider sequenceProvider;
 
     /**
+     * 指标埋点
+     */
+    private final TodoMetrics todoMetrics;
+
+    /**
      * 日期提供者，便于单测替换为固定日期
      */
     private final Supplier<LocalDate> dateSupplier;
 
     /**
-     * 生产构造：注入取号 SPI，日期取系统当天。
+     * 生产构造：注入取号 SPI，日期取业务时区当天。
      *
      * @param sequenceProvider 取号 SPI
+     * @param todoMetrics      指标埋点
      */
     @Autowired
-    public TodoNoGeneratorImpl(TodoSequenceProvider sequenceProvider) {
-        this(sequenceProvider, LocalDate::now);
+    public TodoNoGeneratorImpl(TodoSequenceProvider sequenceProvider, TodoMetrics todoMetrics) {
+        this(sequenceProvider, todoMetrics, () -> LocalDate.now(TodoConstants.BIZ_ZONE));
     }
 
     /**
      * 全参构造，供单测使用。
      *
      * @param sequenceProvider 取号 SPI
+     * @param todoMetrics      指标埋点
      * @param dateSupplier     日期提供者
      */
-    TodoNoGeneratorImpl(TodoSequenceProvider sequenceProvider, Supplier<LocalDate> dateSupplier) {
+    TodoNoGeneratorImpl(TodoSequenceProvider sequenceProvider, TodoMetrics todoMetrics,
+                        Supplier<LocalDate> dateSupplier) {
         this.sequenceProvider = sequenceProvider;
+        this.todoMetrics = todoMetrics;
         this.dateSupplier = dateSupplier;
     }
 
@@ -67,6 +77,9 @@ public class TodoNoGeneratorImpl implements TodoNoGenerator {
     public String nextTodoNo() {
         String dateKey = DATE_FORMATTER.format(dateSupplier.get());
         long sequence = sequenceProvider.nextSequence(dateKey);
+        if (sequenceProvider.isDegraded()) {
+            todoMetrics.recordNoDegrade();
+        }
         long suffix = Math.abs(sequence % TodoConstants.TODO_NO_SEQ_MODULUS);
         return TodoConstants.TODO_NO_PREFIX + dateKey + padLeft(String.valueOf(suffix));
     }

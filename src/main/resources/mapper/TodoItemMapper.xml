@@ -39,6 +39,18 @@
         LIMIT 1
     </select>
 
+    <!-- 唯一键冲突后的幂等回查：加锁读可读到并发事务刚提交的记录（快照读不可见） -->
+    <select id="selectByRequestIdForUpdate" resultMap="TodoItemResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM todo_item
+        WHERE tenant_id = #{tenantId}
+        AND request_id = #{requestId}
+        AND is_deleted = 0
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
     <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id"
             parameterType="com.antdigital.todo.dao.entity.TodoItemDO">
         INSERT INTO todo_item (

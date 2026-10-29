@@ -56,7 +56,7 @@ public class TodoExceptionHandler {
     @ExceptionHandler(TodoBizException.class)
     public ResponseEntity<ApiResult<Void>> handleBizException(TodoBizException e) {
         LOGGER.warn("todo biz exception, code={}, msg={}", e.getCode(), e.getMessage());
-        TodoErrorCodeEnum errorCode = resolveByCode(e.getCode());
+        TodoErrorCodeEnum errorCode = TodoErrorCodeEnum.of(e.getCode());
         return ResponseEntity.status(resolveHttpStatus(errorCode))
                 .body(new ApiResult<>(e.getCode(), e.getMessage(), null));
     }
@@ -115,7 +115,7 @@ public class TodoExceptionHandler {
     }
 
     /**
-     * 兜底异常处理：避免异常堆栈直出到前端。
+     * 兜底异常处理：避免异常堆栈直出到前端，使用独立错误码区分存储异常。
      *
      * @param e 未预期异常
      * @return 统一响应体
@@ -123,7 +123,7 @@ public class TodoExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResult<Void>> handleUnexpected(Exception e) {
         LOGGER.error("todo unexpected error", e);
-        return buildError(TodoErrorCodeEnum.STORAGE_ERROR);
+        return buildError(TodoErrorCodeEnum.UNKNOWN_ERROR);
     }
 
     /**
@@ -146,21 +146,6 @@ public class TodoExceptionHandler {
     }
 
     /**
-     * 错误码字符串反查枚举，未知码归入存储异常。
-     *
-     * @param code 错误码字符串
-     * @return 错误码枚举
-     */
-    private TodoErrorCodeEnum resolveByCode(String code) {
-        for (TodoErrorCodeEnum errorCode : TodoErrorCodeEnum.values()) {
-            if (errorCode.getCode().equals(code)) {
-                return errorCode;
-            }
-        }
-        return TodoErrorCodeEnum.STORAGE_ERROR;
-    }
-
-    /**
      * 错误码映射 HTTP 状态。
      *
      * @param errorCode 错误码枚举
@@ -179,8 +164,11 @@ public class TodoExceptionHandler {
                 return HttpStatus.FORBIDDEN;
             case RATE_LIMITED:
                 return HttpStatus.TOO_MANY_REQUESTS;
+            case FEATURE_DISABLED:
+                return HttpStatus.SERVICE_UNAVAILABLE;
             case TODO_NO_CONFLICT:
             case STORAGE_ERROR:
+            case UNKNOWN_ERROR:
             default:
                 return HttpStatus.INTERNAL_SERVER_ERROR;
         }

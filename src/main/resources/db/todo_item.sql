@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS `todo_item`
     `id`           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '系统自增主键',
     `todo_no`      VARCHAR(32)     NOT NULL DEFAULT '' COMMENT '待办展示编号：TD+yyyyMMdd+6位序号',
     `request_id`   VARCHAR(64)     NOT NULL DEFAULT '' COMMENT '创建请求幂等键（前端 UUID）',
-    `tenant_id`    VARCHAR(32)     NOT NULL DEFAULT '0' COMMENT '租户标识，本期固定 0',
+    `tenant_id`    VARCHAR(32)     NOT NULL DEFAULT '0' COMMENT '租户标识，取自网关签名请求头',
     `item_name`    VARCHAR(128)    NOT NULL DEFAULT '' COMMENT '事项名称，必填',
     `item_desc`    VARCHAR(512)    NOT NULL DEFAULT '' COMMENT '事项描述，选填，纯文本',
     `status`       TINYINT         NOT NULL DEFAULT 0 COMMENT '待办状态：0-待处理，1-已完成，2-已取消',

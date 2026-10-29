@@ -12,8 +12,9 @@ import org.springframework.stereotype.Component;
  * 待办数据访问编排（Manager 层）：对 Mapper 做异常语义转换，使业务层不感知持久化框架异常。
  *
  * <p>MyBatis-Spring 会把数据库唯一约束冲突翻译为 {@link DuplicateKeyException}，
- * 本类将其转换为 {@link TodoDuplicateKeyException} 并解析冲突索引名，
- * 供业务层区分「幂等键冲突」与「编号冲突」。
+ * 本类将其转换为 {@link TodoDuplicateKeyException} 并尽力解析冲突索引名，供业务层
+ * 区分「幂等键冲突」与「编号冲突」。索引名解析仅用于日志与判断提示，**不作为正确性依据**：
+ * 解析失败时业务层仍会先做幂等回查，避免把幂等冲突误判为编号冲突。
  *
  * @author AiWork
  * @date 2026/10/29
@@ -51,6 +52,16 @@ public class TodoItemManager {
     }
 
     /**
+     * 按租户 + 幂等键加锁查询未删除的待办，用于唯一键冲突后的幂等回查。
+     *
+     * @param query 查询条件载体
+     * @return 命中的待办，未命中返回 null
+     */
+    public TodoItemDO selectByRequestIdForUpdate(TodoItemDO query) {
+        return todoItemMapper.selectByRequestIdForUpdate(query);
+    }
+
+    /**
      * 新增待办，唯一键冲突转换为业务可识别的异常。
      *
      * @param todoItem 待办实体，自增主键回填至 id
@@ -71,7 +82,7 @@ public class TodoItemManager {
      * 从数据库异常信息中解析冲突的唯一索引名称。
      *
      * @param e 唯一键冲突异常
-     * @return 冲突索引名；无法识别时返回空串（由业务层按未知冲突处理）
+     * @return 冲突索引名；无法识别时返回空串（业务层按未知冲突处理：先幂等回查再重试）
      */
     private String resolveConstraintName(DuplicateKeyException e) {
         Throwable cause = e.getMostSpecificCause();

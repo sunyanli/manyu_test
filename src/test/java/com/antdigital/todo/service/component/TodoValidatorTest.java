@@ -64,7 +64,8 @@ class TodoValidatorTest {
     @DisplayName("控制字符被剔除，换行与制表符保留")
     void should_removeControlCharsAndKeepNewline_when_descHasControlChars() {
         // Arrange
-        TodoCreateRequest request = buildRequest(VALID_REQUEST_ID, "整理周报", "第一行\n第二行\t结束\u0000");
+        TodoCreateRequest request =
+                buildRequest(VALID_REQUEST_ID, "整理周报", "第一行\n第二行\t结束\u0000");
 
         // Act
         ValidatedTodo validated = todoValidator.validateAndNormalize(request);
@@ -130,7 +131,8 @@ class TodoValidatorTest {
 
     @ParameterizedTest
     @NullAndEmptySource
-    @ValueSource(strings = {"   ", "req 1", "req#1", "invalid-request-id-which-is-way-too-long-to-be-accepted-by-the-validator-0001"})
+    @ValueSource(strings = {"   ", "req 1", "req#1",
+            "invalid-request-id-which-is-way-too-long-to-be-accepted-by-the-validator-0001"})
     @DisplayName("幂等键缺失、含非法字符或超长时返回 TODO_0001")
     void should_throwParamInvalid_when_requestIdIllegal(String requestId) {
         // Arrange

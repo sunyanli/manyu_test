@@ -13,6 +13,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * {@link TodoItemManager} 唯一键冲突转换单元测试。
  *
+ * <p>关注点：索引名解析仅用于日志与诊断，解析失败必须原样传递空串，由业务层按「未知冲突」
+ * 处理（先幂等回查、再重试），避免把幂等冲突误判为编号冲突。
+ *
  * @author AiWork
  * @date 2026/10/29
  */
@@ -64,19 +67,7 @@ class TodoItemManagerTest {
     @DisplayName("无冲突时新增成功，主键由 Mapper 回填")
     void should_insertSuccessfully_when_noConflict() {
         // Arrange
-        TodoItemMapper mapper = new TodoItemMapper() {
-            @Override
-            public TodoItemDO selectByRequestId(TodoItemDO query) {
-                return null;
-            }
-
-            @Override
-            public int insert(TodoItemDO todoItem) {
-                todoItem.setId(1L);
-                return 1;
-            }
-        };
-        TodoItemManager manager = new TodoItemManager(mapper);
+        TodoItemManager manager = new TodoItemManager(new StubTodoItemMapper(null, false));
         TodoItemDO entity = new TodoItemDO();
 
         // Act
@@ -86,17 +77,63 @@ class TodoItemManagerTest {
         assertThat(entity.getId()).isEqualTo(1L);
     }
 
-    private TodoItemMapper buildMapper(String duplicateMessage) {
-        return new TodoItemMapper() {
-            @Override
-            public TodoItemDO selectByRequestId(TodoItemDO query) {
-                return null;
-            }
+    @Test
+    @DisplayName("按幂等键加锁查询：透传租户与幂等键")
+    void should_queryForUpdate_when_selectByRequestIdForUpdate() {
+        // Arrange
+        StubTodoItemMapper mapper = new StubTodoItemMapper(null, false);
+        TodoItemManager manager = new TodoItemManager(mapper);
+        TodoItemDO query = new TodoItemDO();
+        query.setTenantId("7");
+        query.setRequestId("req-1");
 
-            @Override
-            public int insert(TodoItemDO todoItem) {
+        // Act
+        manager.selectByRequestIdForUpdate(query);
+
+        // Assert
+        assertThat(mapper.lastQuery.getTenantId()).isEqualTo("7");
+        assertThat(mapper.lastQuery.getRequestId()).isEqualTo("req-1");
+    }
+
+    private TodoItemMapper buildMapper(String duplicateMessage) {
+        return new StubTodoItemMapper(duplicateMessage, true);
+    }
+
+    /**
+     * Mapper 替身：可选择在插入时抛出唯一键冲突。
+     */
+    private static final class StubTodoItemMapper implements TodoItemMapper {
+
+        private final String duplicateMessage;
+
+        private final boolean duplicateOnInsert;
+
+        private TodoItemDO lastQuery;
+
+        private StubTodoItemMapper(String duplicateMessage, boolean duplicateOnInsert) {
+            this.duplicateMessage = duplicateMessage;
+            this.duplicateOnInsert = duplicateOnInsert;
+        }
+
+        @Override
+        public TodoItemDO selectByRequestId(TodoItemDO query) {
+            this.lastQuery = query;
+            return null;
+        }
+
+        @Override
+        public TodoItemDO selectByRequestIdForUpdate(TodoItemDO query) {
+            this.lastQuery = query;
+            return null;
+        }
+
+        @Override
+        public int insert(TodoItemDO todoItem) {
+            if (duplicateOnInsert) {
                 throw new DuplicateKeyException(duplicateMessage);
             }
-        };
+            todoItem.setId(1L);
+            return 1;
+        }
     }
 }

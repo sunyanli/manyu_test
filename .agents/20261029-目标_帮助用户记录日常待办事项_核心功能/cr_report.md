@@ -496,34 +496,36 @@ L116|        }
 ## 8. 修复任务列表
 
 > 供后续改代码逐项执行与核销。
+>
+> **修复状态（2026-10-29）**：P0×3、P1×6、P2×10 已全部修复并通过 `mvn test`（111/111），逐项结论与验证证据见 `2026-10-29-todo-create-cr-fix-report.md`。
 
 ### P0
 
-- [ ] **P0** `GatewayAuthIntegrationImpl.java:50-75` + `TodoServiceImpl.java:201-210` — 接入网关签名/票据真实校验（`auth.verify.enabled` 默认 true），身份取自校验结果；权限判定改为对接权限平台权限点（R06），不再信任客户端可控的 `X-User-Id`/`X-User-Roles`。
-- [ ] **P0** `TodoServiceImpl.java:104-110` — 新增 `todo.create.enabled` 总开关与 `todo.create.gray.tenants` 灰度判定，未命中返回「功能未开放」，并在 `application.yml` 补齐配置项。
-- [ ] **P0** `TodoServiceImpl.java:143-147` — 补齐 `todo_create_total`/`todo_create_cost_ms`/`todo_create_idempotent_hit_total`/`todo_create_rate_limited_total`/`todo_no_degrade_total` 指标埋点与告警接入。
+- [x] **P0** `GatewayAuthIntegrationImpl.java:50-75` + `TodoServiceImpl.java:201-210` — 接入网关签名/票据真实校验（`auth.verify.enabled` 默认 true），身份取自校验结果；权限判定改为对接权限平台权限点（R06），不再信任客户端可控的 `X-User-Id`/`X-User-Roles`。
+- [x] **P0** `TodoServiceImpl.java:104-110` — 新增 `todo.create.enabled` 总开关与 `todo.create.gray.tenants` 灰度判定，未命中返回「功能未开放」，并在 `application.yml` 补齐配置项。
+- [x] **P0** `TodoServiceImpl.java:143-147` — 补齐 `todo_create_total`/`todo_create_cost_ms`/`todo_create_idempotent_hit_total`/`todo_create_rate_limited_total`/`todo_no_degrade_total` 指标埋点与告警接入。
 
 ### P1
 
-- [ ] **P1** `GatewayAuthIntegrationImpl.java:70-73` — 删除 `tenantId` 静默回落 `"0"`，缺失时按 R05 抛 `TODO_0005`。
-- [ ] **P1** `TodoServiceImpl.java:143` — 将审计投递移出 `@Transactional`（事务提交后事件回调或 `TransactionSynchronization`），避免回滚仍记成功审计。
-- [ ] **P1** `TodoItemManager.java:76-89` — 消除对 DB 错误文案的依赖：改为插入前按 `request_id` 二次确认，或冲突后无条件重查 `request_id`，解析失败时仍返回首次结果。
-- [ ] **P1** `SnowflakeSequenceProvider.java:56-58` — 去掉 `(0L, 0L)` 默认构造，改由配置/环境注入唯一 `workerId`/`datacenterId`；`TodoNoGeneratorImpl.java:70` 的 6 位取模改为更高基数（如 8 位）或直接用号段保证不碰撞。
-- [ ] **P1** `AuditIntegrationImpl.java:74-80` — 队列满/投递失败接入告警计数（对接 P0 的指标体系），满足 R10「ERROR 日志 + 监控告警」。
-- [ ] **P1** `TodoRateLimiter.java:40-47` — 明确双层限流落点：要么接入集中式限流（Redis/网关）保证 30 次/分钟全局限额，要么在 `docs/modules/todo/README.md` 显著标注「本服务仅单实例限流，集群限额由网关保证」并给出网关配置项。
+- [x] **P1** `GatewayAuthIntegrationImpl.java:70-73` — 删除 `tenantId` 静默回落 `"0"`，缺失时按 R05 抛 `TODO_0005`。
+- [x] **P1** `TodoServiceImpl.java:143` — 将审计投递移出 `@Transactional`（事务提交后事件回调或 `TransactionSynchronization`），避免回滚仍记成功审计。
+- [x] **P1** `TodoItemManager.java:76-89` — 消除对 DB 错误文案的依赖：改为插入前按 `request_id` 二次确认，或冲突后无条件重查 `request_id`，解析失败时仍返回首次结果。
+- [x] **P1** `SnowflakeSequenceProvider.java:56-58` — 去掉 `(0L, 0L)` 默认构造，改由配置/环境注入唯一 `workerId`/`datacenterId`；`TodoNoGeneratorImpl.java:70` 的 6 位取模改为更高基数（如 8 位）或直接用号段保证不碰撞。
+- [x] **P1** `AuditIntegrationImpl.java:74-80` — 队列满/投递失败接入告警计数（对接 P0 的指标体系），满足 R10「ERROR 日志 + 监控告警」。
+- [x] **P1** `TodoRateLimiter.java:40-47` — 明确双层限流落点：要么接入集中式限流（Redis/网关）保证 30 次/分钟全局限额，要么在 `docs/modules/todo/README.md` 显著标注「本服务仅单实例限流，集群限额由网关保证」并给出网关配置项。
 
 ### P2（可选）
 
-- [ ] **P2** `TodoServiceImpl.java:220`、`TodoNoGeneratorImpl.java:47` — 显式指定时区（如 `ZoneId.of("Asia/Shanghai")` 或统一 UTC），消除 `M016`。
-- [ ] **P2** `TodoExceptionHandler.java:123-127` — 兜底异常改用独立错误码或 `UNKNOWN_ERROR` 语义，避免与 `TODO_0008` 存储异常混淆。
-- [ ] **P2** `TodoRateLimiter.java:45-47` — 用 `@Value("${todo.create.rate-limit-per-minute:30}")` 接线配置项。
-- [ ] **P2** `TodoCreateVO.java:16`、`TodoController.java:85` — 与系分 W01 出参表对齐 `data.id` 类型（保留 String 则同步修订 `design.md` 出参表）。
-- [ ] **P2** `TodoRateLimiter.java:40,66-68` — 为 `timestamps` 增加空闲用户条目淘汰（定期清理或 Caffeine 过期缓存）。
-- [ ] **P2** `AuditIntegrationImpl.java:85-95` — shutdown 前排空/记录剩余事件数量，丢弃时输出 ERROR 并计数。
-- [ ] **P2** `GatewayAuthIntegrationImpl.java:74`、`TodoValidatorTest.java:67`、`TodoValidatorTest.java:133` — 按 120 字符换行。
-- [ ] **P2** `TodoConstants.java:156,166` — 删除未引用常量 `SNOWFLAKE_WORKER_ID_BITS`、`TODO_NO_FALLBACK_SUFFIX_LENGTH`（或补齐降级实现）。
-- [ ] **P2** `TodoServiceImplTest.java:136-154` — 补充「索引名不可识别仍返回首次结果」、跨租户隔离、`/create` 缺 `requestId` 错误码映射用例。
-- [ ] **P2** `SnowflakeSequenceProvider.java:111-118` — `waitUntil` 改为短 `Thread.sleep` 等待，并设置时钟回拨告警阈值。
+- [x] **P2** `TodoServiceImpl.java:220`、`TodoNoGeneratorImpl.java:47` — 显式指定时区（如 `ZoneId.of("Asia/Shanghai")` 或统一 UTC），消除 `M016`。
+- [x] **P2** `TodoExceptionHandler.java:123-127` — 兜底异常改用独立错误码或 `UNKNOWN_ERROR` 语义，避免与 `TODO_0008` 存储异常混淆。
+- [x] **P2** `TodoRateLimiter.java:45-47` — 用 `@Value("${todo.create.rate-limit-per-minute:30}")` 接线配置项。
+- [x] **P2** `TodoCreateVO.java:16`、`TodoController.java:85` — 与系分 W01 出参表对齐 `data.id` 类型（保留 String 则同步修订 `design.md` 出参表）。
+- [x] **P2** `TodoRateLimiter.java:40,66-68` — 为 `timestamps` 增加空闲用户条目淘汰（定期清理或 Caffeine 过期缓存）。
+- [x] **P2** `AuditIntegrationImpl.java:85-95` — shutdown 前排空/记录剩余事件数量，丢弃时输出 ERROR 并计数。
+- [x] **P2** `GatewayAuthIntegrationImpl.java:74`、`TodoValidatorTest.java:67`、`TodoValidatorTest.java:133` — 按 120 字符换行。
+- [x] **P2** `TodoConstants.java:156,166` — 删除未引用常量 `SNOWFLAKE_WORKER_ID_BITS`、`TODO_NO_FALLBACK_SUFFIX_LENGTH`（或补齐降级实现）。
+- [x] **P2** `TodoServiceImplTest.java:136-154` — 补充「索引名不可识别仍返回首次结果」、跨租户隔离、`/create` 缺 `requestId` 错误码映射用例。
+- [x] **P2** `SnowflakeSequenceProvider.java:111-118` — `waitUntil` 改为短 `Thread.sleep` 等待，并设置时钟回拨告警阈值。
 
 ---
 

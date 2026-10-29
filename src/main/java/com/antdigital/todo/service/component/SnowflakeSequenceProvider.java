@@ -1,18 +1,29 @@
 package com.antdigital.todo.service.component;
 
 import com.antdigital.todo.common.constant.TodoConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * 基于雪花算法的本地序号提供者（无外部依赖，多实例部署需注入不同 workerId）。
+ * 基于雪花算法的本地序号提供者（取号降级实现，无外部依赖）。
  *
- * <p>作为取号降级实现：Redis 不可用或未接入时直接使用，进程内线程安全。
+ * <p>节点参数 {@code workerId}/{@code datacenterId} 必须由配置或环境变量注入，且同一集群内
+ * 每个实例的组合唯一（系分 §5.1 支撑层「保证多实例下不重复」）；未注入时保持 0/0 并输出
+ * WARN，多副本高并发下可能生成相同序列，仅用于本地开发。时钟回拨在阈值内短休眠等待，
+ * 超出阈值快速失败，避免长时间自旋占用 CPU。
  *
  * @author AiWork
  * @date 2026/10/29
  */
 @Component
 public class SnowflakeSequenceProvider implements TodoSequenceProvider {
+
+    /**
+     * 日志对象
+     */
+    private static final Logger LOGGER = LoggerFactory.getLogger(SnowflakeSequenceProvider.class);
 
     /**
      * 工作节点 ID 位移量
@@ -51,24 +62,22 @@ public class SnowflakeSequenceProvider implements TodoSequenceProvider {
     private long sequence = 0L;
 
     /**
-     * 使用默认节点参数构造。
-     */
-    public SnowflakeSequenceProvider() {
-        this(0L, 0L);
-    }
-
-    /**
-     * 指定节点参数构造。
+     * 指定节点参数构造：生产环境由配置中心注入唯一组合。
      *
      * @param workerId     工作节点 ID，取值范围 [0, 32)
      * @param datacenterId 数据中心 ID，取值范围 [0, 32)
      */
-    public SnowflakeSequenceProvider(long workerId, long datacenterId) {
+    public SnowflakeSequenceProvider(@Value("${todo.no.worker-id:0}") long workerId,
+                                     @Value("${todo.no.datacenter-id:0}") long datacenterId) {
         if (workerId < 0 || workerId >= TodoConstants.SNOWFLAKE_WORKER_ID_MAX) {
             throw new IllegalArgumentException("workerId out of range: " + workerId);
         }
         if (datacenterId < 0 || datacenterId >= TodoConstants.SNOWFLAKE_DATACENTER_ID_MAX) {
             throw new IllegalArgumentException("datacenterId out of range: " + datacenterId);
+        }
+        if (workerId == 0L && datacenterId == 0L) {
+            LOGGER.warn("snowflake node id not configured (workerId=0, datacenterId=0), "
+                    + "multi-instance deployment may produce duplicate todo_no");
         }
         this.workerId = workerId;
         this.datacenterId = datacenterId;
@@ -84,7 +93,12 @@ public class SnowflakeSequenceProvider implements TodoSequenceProvider {
     public synchronized long nextSequence(String dateKey) {
         long timestamp = System.currentTimeMillis();
         if (timestamp < lastTimestamp) {
-            // 时钟回拨：等待至上一毫秒，避免生成重复 ID
+            long backward = lastTimestamp - timestamp;
+            if (backward > TodoConstants.SNOWFLAKE_MAX_BACKWARD_WAIT_MILLIS) {
+                LOGGER.error("clock moved backwards beyond tolerance, backward={}ms", backward);
+                throw new IllegalStateException("clock moved backwards: " + backward + "ms");
+            }
+            LOGGER.warn("clock moved backwards within tolerance, wait. backward={}ms", backward);
             timestamp = waitUntil(lastTimestamp);
         }
         if (timestamp == lastTimestamp) {
@@ -103,7 +117,17 @@ public class SnowflakeSequenceProvider implements TodoSequenceProvider {
     }
 
     /**
-     * 自旋等待至目标毫秒。
+     * 本实现为取号降级路径，需上报 {@code todo_no_degrade_total}。
+     *
+     * @return 恒为 true
+     */
+    @Override
+    public boolean isDegraded() {
+        return true;
+    }
+
+    /**
+     * 短休眠等待至目标毫秒，替代纯自旋忙等。
      *
      * @param targetTimestamp 目标毫秒时间戳
      * @return 实际到达的时间戳
@@ -111,7 +135,14 @@ public class SnowflakeSequenceProvider implements TodoSequenceProvider {
     private long waitUntil(long targetTimestamp) {
         long timestamp = System.currentTimeMillis();
         while (timestamp < targetTimestamp) {
-            Thread.yield();
+            long sleepMillis = Math.min(targetTimestamp - timestamp,
+                    TodoConstants.SNOWFLAKE_MAX_WAIT_SLEEP_MILLIS);
+            try {
+                Thread.sleep(sleepMillis);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("interrupted while waiting snowflake clock", e);
+            }
             timestamp = System.currentTimeMillis();
         }
         return timestamp;

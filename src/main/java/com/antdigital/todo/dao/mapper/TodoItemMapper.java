@@ -17,12 +17,23 @@ import org.apache.ibatis.annotations.Mapper;
 public interface TodoItemMapper {
 
     /**
-     * 按租户 + 幂等键查询未逻辑删除的待办。
+     * 按租户 + 幂等键查询未逻辑删除的待办（快照读）。
      *
      * @param query 查询条件载体，需设置 tenantId 与 requestId
      * @return 命中的待办；不存在时返回 null
      */
     TodoItemDO selectByRequestId(TodoItemDO query);
+
+    /**
+     * 按租户 + 幂等键查询并加行锁（当前读）。
+     *
+     * <p>用于唯一键冲突后的幂等回查：并发事务在本事务快照之后提交的记录，
+     * 普通快照读不可见，加锁读可读取最新已提交版本。
+     *
+     * @param query 查询条件载体，需设置 tenantId 与 requestId
+     * @return 命中的待办；不存在时返回 null
+     */
+    TodoItemDO selectByRequestIdForUpdate(TodoItemDO query);
 
     /**
      * 新增待办。
