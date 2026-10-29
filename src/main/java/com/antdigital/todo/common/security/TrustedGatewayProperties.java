@@ -6,7 +6,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 受信登录网关白名单配置。列表为空表示不校验来源 IP（由网络层保证只有网关可达）。
+ * 受信登录网关白名单配置，支持精确 IP 与 IPv4 CIDR。
+ *
+ * <p>列表为空时按 fail-closed 拒绝全部 {@code /api/**} 请求，
+ * 必须显式配置网关地址后才可对外服务。</p>
  *
  * @author AiWork
  */

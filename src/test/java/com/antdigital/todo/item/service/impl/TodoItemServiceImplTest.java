@@ -3,6 +3,7 @@ package com.antdigital.todo.item.service.impl;
 import com.antdigital.todo.common.api.ResultCode;
 import com.antdigital.todo.common.context.OperatorContext;
 import com.antdigital.todo.common.exception.BizException;
+import com.antdigital.todo.common.metrics.TodoCreateMetrics;
 import com.antdigital.todo.item.mapper.TodoItemMapper;
 import com.antdigital.todo.item.model.CreateTodoRequest;
 import com.antdigital.todo.item.model.CreateTodoResponse;
@@ -18,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -41,6 +43,9 @@ class TodoItemServiceImplTest {
 
     @Mock
     private TodoItemMapper todoItemMapper;
+
+    @Mock
+    private TodoCreateMetrics todoCreateMetrics;
 
     @InjectMocks
     private TodoItemServiceImpl todoItemService;
@@ -78,6 +83,7 @@ class TodoItemServiceImplTest {
         assertThat(saved.getStatus()).isEqualTo(0);
         assertThat(saved.getGmtCreate()).isNotNull();
         assertThat(saved.getGmtModified()).isNotNull();
+        verify(todoCreateMetrics, times(1)).recordSuccess(anyLong());
     }
 
     @Test
@@ -113,6 +119,7 @@ class TodoItemServiceImplTest {
                 .extracting(ex -> ((BizException) ex).getResultCode())
                 .isEqualTo(ResultCode.TODO_001);
         verify(todoItemMapper, never()).insert(any(TodoItemDO.class));
+        verify(todoCreateMetrics, never()).recordSuccess(anyLong());
     }
 
     @Test

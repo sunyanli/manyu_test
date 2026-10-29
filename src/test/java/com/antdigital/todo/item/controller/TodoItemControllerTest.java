@@ -5,9 +5,11 @@ import com.antdigital.todo.common.context.OperatorContext;
 import com.antdigital.todo.common.context.OperatorContextHolder;
 import com.antdigital.todo.common.exception.BizException;
 import com.antdigital.todo.common.exception.GlobalExceptionHandler;
+import com.antdigital.todo.common.metrics.TodoCreateMetrics;
 import com.antdigital.todo.item.model.CreateTodoRequest;
 import com.antdigital.todo.item.model.CreateTodoResponse;
 import com.antdigital.todo.item.service.TodoItemService;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,8 +47,9 @@ class TodoItemControllerTest {
     @BeforeEach
     void setUp() {
         TodoItemController controller = new TodoItemController(todoItemService);
+        TodoCreateMetrics todoCreateMetrics = new TodoCreateMetrics(new SimpleMeterRegistry());
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
-                .setControllerAdvice(new GlobalExceptionHandler())
+                .setControllerAdvice(new GlobalExceptionHandler(todoCreateMetrics))
                 .build();
         OperatorContextHolder.set(new OperatorContext("U1001", "张三", "T01"));
     }

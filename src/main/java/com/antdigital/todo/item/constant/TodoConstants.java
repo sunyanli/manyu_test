@@ -37,8 +37,11 @@ public final class TodoConstants {
     /** 登录态字段最大长度。 */
     public static final int OPERATOR_FIELD_MAX_LEN = 64;
 
-    /** 单条 INSERT 超时时间（毫秒），与 application.yml 中 default-statement-timeout=3 秒保持一致。 */
-    public static final int INSERT_TIMEOUT_MS = 3000;
+    /** 请求属性键：本次请求的结果码，供访问日志与指标复用。 */
+    public static final String ATTR_RESULT_CODE = "todo.result.code";
+
+    /** 纳秒转毫秒的换算系数。 */
+    public static final long NANOS_PER_MILLI = 1_000_000L;
 
     /** 展示与存储统一使用 UTC+8。 */
     public static final ZoneId ZONE_UTC8 = ZoneId.of("Asia/Shanghai");

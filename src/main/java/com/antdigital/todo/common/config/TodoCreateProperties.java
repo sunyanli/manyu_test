@@ -16,8 +16,8 @@ public class TodoCreateProperties {
     /** 总开关，关闭后接口直接返回 TODO_007。 */
     private boolean enabled = true;
 
-    /** 是否启用按租户尾号灰度，关闭表示全量放开。 */
-    private boolean grayEnabled = false;
+    /** 是否按租户尾号灰度，关闭表示全量放开；上线初期默认开启灰度。 */
+    private boolean grayEnabled = true;
 
     /** 灰度命中的租户 ID 尾号，如 0,1,2。 */
     private List<String> grayTenantSuffix = new ArrayList<String>();

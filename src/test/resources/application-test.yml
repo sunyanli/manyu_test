@@ -8,3 +8,9 @@ spring:
     init:
       mode: always
       schema-locations: classpath:schema-h2.sql
+
+todo:
+  security:
+    # MockMvc 默认来源 IP 为 127.0.0.1，测试按 fail-closed 白名单放行回环地址
+    trusted-gateway-ips:
+      - "127.0.0.1"

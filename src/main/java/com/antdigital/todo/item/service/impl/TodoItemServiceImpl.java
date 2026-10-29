@@ -3,6 +3,7 @@ package com.antdigital.todo.item.service.impl;
 import com.antdigital.todo.common.api.ResultCode;
 import com.antdigital.todo.common.context.OperatorContext;
 import com.antdigital.todo.common.exception.BizException;
+import com.antdigital.todo.common.metrics.TodoCreateMetrics;
 import com.antdigital.todo.item.constant.TodoConstants;
 import com.antdigital.todo.item.enums.TodoStatus;
 import com.antdigital.todo.item.mapper.TodoItemMapper;
@@ -33,12 +34,16 @@ public class TodoItemServiceImpl implements TodoItemService {
 
     private final TodoItemMapper todoItemMapper;
 
-    public TodoItemServiceImpl(TodoItemMapper todoItemMapper) {
+    private final TodoCreateMetrics todoCreateMetrics;
+
+    public TodoItemServiceImpl(TodoItemMapper todoItemMapper, TodoCreateMetrics todoCreateMetrics) {
         this.todoItemMapper = todoItemMapper;
+        this.todoCreateMetrics = todoCreateMetrics;
     }
 
     @Override
     public CreateTodoResponse createTodo(CreateTodoRequest request, OperatorContext operator) {
+        long startNanos = System.nanoTime();
         if (request == null || operator == null) {
             throw new BizException(ResultCode.TODO_001, "请求参数不能为空");
         }
@@ -60,6 +65,7 @@ public class TodoItemServiceImpl implements TodoItemService {
                     affectedRows, operator.getTenantId(), operator.getUserId());
             throw new BizException(ResultCode.TODO_004);
         }
+        todoCreateMetrics.recordSuccess(System.nanoTime() - startNanos);
         return buildResponse(record);
     }
 

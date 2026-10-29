@@ -2,6 +2,7 @@ package com.antdigital.todo.common.interceptor;
 
 import com.antdigital.todo.common.api.ResultCode;
 import com.antdigital.todo.common.config.TodoCreateProperties;
+import com.antdigital.todo.common.config.TodoCreateSettings;
 import com.antdigital.todo.common.context.OperatorContext;
 import com.antdigital.todo.common.context.OperatorContextHolder;
 import com.antdigital.todo.common.exception.BizException;
@@ -34,7 +35,7 @@ class RateLimitInterceptorTest {
         // Arrange
         TodoCreateProperties properties = new TodoCreateProperties();
         properties.setRateLimitQps(QPS);
-        RateLimitInterceptor interceptor = new RateLimitInterceptor(properties);
+        RateLimitInterceptor interceptor = new RateLimitInterceptor(new TodoCreateSettings(properties, null));
         OperatorContextHolder.set(new OperatorContext("U1001", "张三", "T01"));
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/todo/item/create");
         for (int i = 0; i < QPS; i++) {
@@ -52,7 +53,8 @@ class RateLimitInterceptorTest {
     @DisplayName("无登录态上下文：直接放行，由登录拦截器负责拒绝")
     void should_pass_when_operatorAbsent() {
         // Arrange
-        RateLimitInterceptor interceptor = new RateLimitInterceptor(new TodoCreateProperties());
+        RateLimitInterceptor interceptor =
+                new RateLimitInterceptor(new TodoCreateSettings(new TodoCreateProperties(), null));
         MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/todo/item/create");
 
         // Act

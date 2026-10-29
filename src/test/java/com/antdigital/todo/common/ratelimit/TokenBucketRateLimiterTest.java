@@ -52,4 +52,20 @@ class TokenBucketRateLimiterTest {
         // Act & Assert
         assertThat(rateLimiter.tryAcquire("U1001", 1, 0)).isTrue();
     }
+
+    @Test
+    @DisplayName("空闲桶按周期淘汰：长期未访问的 key 不再占用内存")
+    void should_evictIdleBuckets_when_evictIntervalReached() {
+        // Arrange：扫描间隔为 0、空闲阈值为负数，
+        // 保证下一次请求必然触发淘汰，避免依赖时钟精度
+        TokenBucketRateLimiter rateLimiter = new TokenBucketRateLimiter(0L, -1L);
+        rateLimiter.tryAcquire("U1001", 1, QPS);
+        rateLimiter.tryAcquire("U1002", 1, QPS);
+
+        // Act
+        rateLimiter.tryAcquire("U1003", 1, QPS);
+
+        // Assert：历史空闲桶被清理，仅保留本次访问的 key
+        assertThat(rateLimiter.bucketCount()).isEqualTo(1);
+    }
 }

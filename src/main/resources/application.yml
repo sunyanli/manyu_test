@@ -5,7 +5,7 @@ spring:
   application:
     name: todo-app
   datasource:
-    url: jdbc:mysql://127.0.0.1:3306/ant_todo?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://127.0.0.1:3306/ant_todo?useUnicode=true&characterEncoding=UTF-8&connectionCollation=utf8mb4_general_ci&serverTimezone=Asia/Shanghai
     username: ${DB_USERNAME:todo}
     password: ${DB_PASSWORD:todo}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -23,7 +23,7 @@ management:
     web:
       base-path: /api/actuator
       exposure:
-        include: health
+        include: health,metrics,prometheus
   endpoint:
     health:
       show-details: never
@@ -32,8 +32,8 @@ todo:
   create:
     # 总开关，关闭后新增接口直接返回 TODO_007
     enabled: true
-    # 按租户尾号灰度，关闭表示全量
-    gray-enabled: false
+    # 按租户尾号灰度，关闭表示全量；上线初期保持开启，按 0,1,2 起步观察后再放开
+    gray-enabled: true
     gray-tenant-suffix:
       - "0"
       - "1"
@@ -41,5 +41,10 @@ todo:
     # 单用户限流阈值（QPS）
     rate-limit-qps: 10
   security:
-    # 受信登录网关 IP 白名单，为空表示由网络层保证只有网关可达
-    trusted-gateway-ips: []
+    # 受信登录网关 IP / CIDR 白名单，生产通过环境变量 TRUSTED_GATEWAY_IPS 注入
+    # 为空时按 fail-closed 拒绝全部 /api 请求（不再放行任意来源）
+    trusted-gateway-ips: ${TRUSTED_GATEWAY_IPS:127.0.0.1}
+
+logging:
+  pattern:
+    level: "%5p [traceId:%X{traceId:-}]"

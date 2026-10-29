@@ -31,7 +31,8 @@ class TodoTextNormalizerTest {
     @Test
     @DisplayName("规范化：换行与制表符折叠为单个空格")
     void should_collapseLineFeedAndTab_toSingleSpace() {
-        assertThat(TodoTextNormalizer.normalize("第一行\n第二行\t第三行")).isEqualTo("第一行 第二行 第三行");
+        String raw = "第一行\n第二行\t第三行";
+        assertThat(TodoTextNormalizer.normalize(raw)).isEqualTo("第一行 第二行 第三行");
     }
 
     @ParameterizedTest

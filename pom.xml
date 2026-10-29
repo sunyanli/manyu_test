@@ -50,6 +50,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- 指标上报：Prometheus 抓取，承载 todo.create.* 业务指标 -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
         <!-- 持久层：MyBatis-Plus 单表写入 -->
         <dependency>
             <groupId>com.baomidou</groupId>

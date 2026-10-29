@@ -1,7 +1,7 @@
 package com.antdigital.todo.common.interceptor;
 
 import com.antdigital.todo.common.api.ResultCode;
-import com.antdigital.todo.common.config.TodoCreateProperties;
+import com.antdigital.todo.common.config.TodoCreateSettings;
 import com.antdigital.todo.common.context.OperatorContext;
 import com.antdigital.todo.common.context.OperatorContextHolder;
 import com.antdigital.todo.common.exception.BizException;
@@ -28,10 +28,10 @@ public class RateLimitInterceptor implements HandlerInterceptor {
 
     private final TokenBucketRateLimiter rateLimiter = new TokenBucketRateLimiter();
 
-    private final TodoCreateProperties createProperties;
+    private final TodoCreateSettings createSettings;
 
-    public RateLimitInterceptor(TodoCreateProperties createProperties) {
-        this.createProperties = createProperties;
+    public RateLimitInterceptor(TodoCreateSettings createSettings) {
+        this.createSettings = createSettings;
     }
 
     @Override
@@ -41,7 +41,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             return true;
         }
         boolean acquired = rateLimiter.tryAcquire(operator.getUserId(), PERMITS_PER_REQUEST,
-                createProperties.getRateLimitQps());
+                createSettings.rateLimitQps());
         if (!acquired) {
             LOGGER.warn("用户请求超过限流阈值, userId={}, uri={}",
                     operator.getUserId(), request.getRequestURI());
