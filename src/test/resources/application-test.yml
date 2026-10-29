@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:tododb;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-h2.sql
+
+todo:
+  security:
+    # MockMvc 默认来源 IP 为 127.0.0.1，测试按 fail-closed 白名单放行回环地址
+    trusted-gateway-ips:
+      - "127.0.0.1"

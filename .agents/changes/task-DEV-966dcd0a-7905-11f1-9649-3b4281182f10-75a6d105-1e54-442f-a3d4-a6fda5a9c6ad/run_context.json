@@ -1,0 +1,68 @@
+{
+  "change_id": "task-DEV-966dcd0a-7905-11f1-9649-3b4281182f10-75a6d105-1e54-442f-a3d4-a6fda5a9c6ad",
+  "stage": "review",
+  "skill": "dtazziboot-java-code-review",
+  "review_round": 2,
+  "review_type": "修复后复审",
+  "reviewed_commit": "00bc14d",
+  "reviewed_files": 24,
+  "blocker_count": 0,
+  "p1_count": 1,
+  "p2_count": 6,
+  "merge_advice": "修复后合并",
+  "report_path": ".agents/20261029-目标_帮助用户记录日常待办事项_核心功能/cr_report.md",
+  "checklist_path": ".agents/20261029-目标_帮助用户记录日常待办事项_核心功能/2026-10-29-todo-create-cr-checklist.md",
+  "test_baseline": "JAVA_HOME=zulu17 mvn -o test: Tests run 88, Failures 0, Errors 0, Skipped 0, BUILD SUCCESS",
+  "scan_all_rules": "5 findings (P0=5) | 52/222 rules scanned — 4 条误报 + 1 条真命中降级 P2（GatewayIpMatcher.java:105）",
+  "resolved_from_previous_round": [
+    {
+      "id": "P0-1",
+      "rule": "G8.5",
+      "previous_location": "src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java:69-78",
+      "status": "resolved",
+      "evidence": "LoginInterceptor.java:63-81,155-159（校验通过后才 set；拒绝路径 clear）；TraceIdFilter.java:33-37（finally 清 MDC）；LoginInterceptorTest#should_throwTodo007_andClearContext_when_switchOff、#should_throwTodo006_andClearContext_when_tenantSuffixNotInGrayList；TodoCreateIntegrationTest#should_rejectAndClearContext_when_switchOffAtRuntime"
+    },
+    {
+      "id": "P0-2",
+      "rule": "S8.1 / design R11",
+      "previous_location": "src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java:43-48",
+      "status": "resolved",
+      "evidence": "LoginInterceptor.java:99-113（空白名单 fail-closed + 安全告警）；GatewayIpMatcher.java:34-58；application.yml:46；LoginInterceptorTest#should_throwTodo002_when_trustedIpListEmpty、#should_pass_when_sourceIpMatchesCidr；GatewayIpMatcherTest（5 例）；TodoCreateIntegrationTest#should_returnTodo002_when_sourceIpNotTrusted"
+    },
+    {
+      "id": "P1-1",
+      "rule": "G16.1",
+      "status": "resolved",
+      "evidence": "TodoCreateMetrics.java:44-59；TodoItemServiceImpl.java:68；GlobalExceptionHandler.java:92-96；LoginInterceptor.java:166-176；pom.xml:54-57；TodoCreateIntegrationTest#should_recordMetrics_when_createSucceeds"
+    },
+    {
+      "id": "P1-2",
+      "rule": "G16.2 / REQ-7",
+      "status": "resolved",
+      "evidence": "TraceContext.java:37-45,59-62；TraceIdFilter.java:31-37；application.yml:48-51；TraceContextTest（4 例）；TodoCreateIntegrationTest#should_generateTraceId_when_headerAbsent"
+    },
+    {
+      "id": "P1-3",
+      "rule": "G17.1",
+      "status": "resolved",
+      "evidence": "TodoCreateSettings.java:40-92（运行期实时绑定）；TodoCreateSettingsTest#should_reflectChangedConfiguration_withoutRestart；TodoCreateIntegrationTest#should_rejectAndClearContext_when_switchOffAtRuntime"
+    }
+  ],
+  "blockers": [],
+  "open_p1": [
+    {
+      "id": "P1-1",
+      "rule": "S8.1",
+      "location": "src/main/java/com/antdigital/todo/common/config/WebMvcConfig.java:33-40",
+      "issue": "两个拦截器均 excludePathPatterns(\"/api/actuator/**\")，而 metrics/prometheus 与业务同端口暴露且无 Spring Security，管理端点无鉴权对外可读"
+    }
+  ],
+  "open_p2": [
+    "GatewayIpMatcher.java:105 — IPv4 解析失败静默无日志",
+    "TodoItemServiceImpl.java:62 — 未单独埋点 DB insert 耗时；requests 指标未按 uri 区分",
+    "LoginInterceptor.java:72 — X-User-Name 无长度/字符校验，超 128 字符退化为 TODO_004",
+    "TodoCreateSettings.java:50-92 — 每请求 4 次属性绑定，建议缓存 + 变更事件失效",
+    "GatewayIpMatcher.java:34-58 — 仅支持 IPv4，IPv6 回源会全量拒绝",
+    "pom.xml:11-12 — name/description 仍为排序模块描述"
+  ]
+}
