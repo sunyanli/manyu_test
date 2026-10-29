@@ -1,0 +1,16 @@
+{
+  "blocker_count": 1,
+  "review_summary": {
+    "p0_count": 1,
+    "p1_count": 5,
+    "p2_count": 3,
+    "merge_recommendation": "修复后合并（需修复P0问题）",
+    "key_issues": [
+      "SQL注入: AlgorithmCallRecordMapper使用`${dimension}`拼接SQL",
+      "CORS配置允许所有来源",
+      "数据库密码硬编码",
+      "导出功能不完整",
+      "ThreadPoolTaskExecutor使用无界队列"
+    ]
+  }
+}
