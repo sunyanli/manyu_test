@@ -5,6 +5,7 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.SelectProvider;
 
 import java.util.List;
 import java.util.Map;
@@ -22,23 +23,17 @@ public interface AlgorithmCallRecordMapper {
             + "#{callerType}, #{callerLevel}, #{callerDept}, #{requestParams}, #{responseResult}, #{costTimeMs})")
     int insert(AlgorithmCallRecord record);
 
-    @Select("SELECT "
-            + "  ${dimension} AS dimension_key, COUNT(*) AS count "
-            + "FROM algorithm_call_record "
-            + "WHERE gmt_create >= #{startTime} AND gmt_create <= #{endTime} "
-            + "GROUP BY ${dimension}")
+    /**
+     * Query statistics with validated dimension column.
+     * Valid dimensions: caller_type, caller_level, caller_dept, algorithm_type
+     */
+    @SelectProvider(type = AlgorithmCallRecordSqlProvider.class, method = "selectStatisticsByDimension")
     List<Map<String, Object>> selectStatisticsByDimension(
             @Param("dimension") String dimension,
             @Param("startTime") String startTime,
             @Param("endTime") String endTime);
 
-    @Select("SELECT "
-            + "  DATE_FORMAT(gmt_create, #{format}) AS time_label, COUNT(*) AS count "
-            + "FROM algorithm_call_record "
-            + "WHERE gmt_create >= #{startTime} AND gmt_create <= #{endTime} "
-            + "  AND (#{algorithmType} IS NULL OR algorithm_type = #{algorithmType}) "
-            + "GROUP BY DATE_FORMAT(gmt_create, #{format}) "
-            + "ORDER BY time_label")
+    @SelectProvider(type = AlgorithmCallRecordSqlProvider.class, method = "selectTrend")
     List<Map<String, Object>> selectTrend(
             @Param("format") String format,
             @Param("startTime") String startTime,

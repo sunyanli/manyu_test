@@ -2,6 +2,8 @@ package com.example.algorithm.service;
 
 import com.example.algorithm.model.dto.ExportStatusResponse;
 
+import java.io.InputStream;
+
 /**
  * Export service for algorithm results.
  */
@@ -24,4 +26,12 @@ public interface ExportService {
      * @return the status response
      */
     ExportStatusResponse queryExportStatus(String taskId);
+
+    /**
+     * Download export file.
+     *
+     * @param taskId the task ID
+     * @return input stream of the file
+     */
+    InputStream downloadExportFile(String taskId);
 }

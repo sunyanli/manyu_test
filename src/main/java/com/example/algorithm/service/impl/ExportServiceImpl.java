@@ -4,8 +4,14 @@ import com.example.algorithm.mapper.AlgorithmExportTaskMapper;
 import com.example.algorithm.model.dto.ExportStatusResponse;
 import com.example.algorithm.model.entity.AlgorithmExportTask;
 import com.example.algorithm.service.ExportService;
+import com.example.algorithm.service.ExportTaskService;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.UUID;
 
 /**
@@ -15,9 +21,11 @@ import java.util.UUID;
 public class ExportServiceImpl implements ExportService {
 
     private final AlgorithmExportTaskMapper exportTaskMapper;
+    private final ExportTaskService exportTaskService;
 
-    public ExportServiceImpl(AlgorithmExportTaskMapper exportTaskMapper) {
+    public ExportServiceImpl(AlgorithmExportTaskMapper exportTaskMapper, ExportTaskService exportTaskService) {
         this.exportTaskMapper = exportTaskMapper;
+        this.exportTaskService = exportTaskService;
     }
 
     @Override
@@ -30,6 +38,7 @@ public class ExportServiceImpl implements ExportService {
         task.setStatus("PENDING");
         task.setOperatorId(operatorId != null ? operatorId : "UNKNOWN");
         exportTaskMapper.insert(task);
+        exportTaskService.executeExportAsync(taskId, algorithmType, params);
         return taskId;
     }
 
@@ -40,5 +49,18 @@ public class ExportServiceImpl implements ExportService {
             return null;
         }
         return new ExportStatusResponse(task.getTaskId(), task.getStatus(), task.getFileUrl());
+    }
+
+    @Override
+    public InputStream downloadExportFile(String taskId) {
+        AlgorithmExportTask task = exportTaskMapper.selectByTaskId(taskId);
+        if (task == null || task.getFileUrl() == null) {
+            return new ByteArrayInputStream(new byte[0]);
+        }
+        try {
+            return new FileInputStream(new File(task.getFileUrl()));
+        } catch (IOException e) {
+            return new ByteArrayInputStream(new byte[0]);
+        }
     }
 }

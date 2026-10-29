@@ -1,6 +1,7 @@
 package com.example.algorithm.service.impl;
 
 import com.example.algorithm.mapper.AlgorithmCallRecordMapper;
+import com.example.algorithm.mapper.AlgorithmCallRecordSqlProvider;
 import com.example.algorithm.model.dto.TrackingStatisticsResponse;
 import com.example.algorithm.model.dto.TrendResponse;
 import com.example.algorithm.model.entity.AlgorithmCallRecord;
@@ -9,8 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -35,17 +34,18 @@ public class TrackingServiceImpl implements TrackingService {
 
     @Override
     @Async
-    public void recordCall(String apiPath, String algorithmType, String params, String result, int costTimeMs) {
+    public void recordCall(String apiPath, String algorithmType, String params, String result, int costTimeMs,
+                             String callerId, String callerName, String callerType, String callerLevel, String callerDept) {
         try {
             AlgorithmCallRecord record = new AlgorithmCallRecord();
             record.setRequestId(UUID.randomUUID().toString().replace("-", ""));
             record.setApiPath(apiPath);
             record.setAlgorithmType(algorithmType);
-            record.setCallerId(getCallerIdFromHeader());
-            record.setCallerName(getHeaderValue("X-Caller-Name"));
-            record.setCallerType(getHeaderValue("X-Caller-Type"));
-            record.setCallerLevel(getHeaderValue("X-Caller-Level"));
-            record.setCallerDept(getHeaderValue("X-Caller-Dept"));
+            record.setCallerId(callerId != null ? callerId : "UNKNOWN");
+            record.setCallerName(callerName);
+            record.setCallerType(callerType);
+            record.setCallerLevel(callerLevel);
+            record.setCallerDept(callerDept);
             record.setRequestParams(params);
             record.setResponseResult(result);
             record.setCostTimeMs(costTimeMs);
@@ -55,27 +55,10 @@ public class TrackingServiceImpl implements TrackingService {
         }
     }
 
-    private String getCallerIdFromHeader() {
-        String callerId = getHeaderValue("X-User-Id");
-        return callerId != null ? callerId : "UNKNOWN";
-    }
-
-    private String getHeaderValue(String headerName) {
-        try {
-            ServletRequestAttributes attrs = (ServletRequestAttributes)
-                    RequestContextHolder.getRequestAttributes();
-            if (attrs != null) {
-                return attrs.getRequest().getHeader(headerName);
-            }
-        } catch (Exception e) {
-            LOG.debug("Unable to get header value for {}", headerName);
-        }
-        return null;
-    }
-
     @Override
     public TrackingStatisticsResponse queryStatistics(String dimension, String startTime, String endTime) {
-        List<Map<String, Object>> rows = callRecordMapper.selectStatisticsByDimension(dimension, startTime, endTime);
+        String validatedDimension = AlgorithmCallRecordSqlProvider.validateDimension(dimension);
+        List<Map<String, Object>> rows = callRecordMapper.selectStatisticsByDimension(validatedDimension, startTime, endTime);
         List<TrackingStatisticsResponse.StatisticsItem> items = new ArrayList<>();
         for (Map<String, Object> row : rows) {
             String key = row.get("dimension_key") != null ? row.get("dimension_key").toString() : "UNKNOWN";
@@ -105,7 +88,8 @@ public class TrackingServiceImpl implements TrackingService {
 
     @Override
     public TrackingStatisticsResponse queryDistribution(String dimension, String startTime, String endTime) {
-        List<Map<String, Object>> rows = callRecordMapper.selectStatisticsByDimension(dimension, startTime, endTime);
+        String validatedDimension = AlgorithmCallRecordSqlProvider.validateDimension(dimension);
+        List<Map<String, Object>> rows = callRecordMapper.selectStatisticsByDimension(validatedDimension, startTime, endTime);
         List<TrackingStatisticsResponse.StatisticsItem> items = new ArrayList<>();
         long total = 0;
         for (Map<String, Object> row : rows) {

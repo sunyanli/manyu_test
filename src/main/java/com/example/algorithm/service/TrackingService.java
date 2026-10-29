@@ -16,8 +16,14 @@ public interface TrackingService {
      * @param params        request params JSON
      * @param result        result status
      * @param costTimeMs    cost time in ms
+     * @param callerId      the caller ID
+     * @param callerName    the caller name
+     * @param callerType    the caller type
+     * @param callerLevel   the caller level
+     * @param callerDept    the caller department
      */
-    void recordCall(String apiPath, String algorithmType, String params, String result, int costTimeMs);
+    void recordCall(String apiPath, String algorithmType, String params, String result, int costTimeMs,
+                      String callerId, String callerName, String callerType, String callerLevel, String callerDept);
 
     /**
      * Query statistics by dimension.
