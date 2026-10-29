@@ -1,16 +1,15 @@
 {
-  "blocker_count": 1,
+  "blocker_count": 4,
   "review_summary": {
-    "p0_count": 1,
+    "p0_count": 4,
     "p1_count": 5,
     "p2_count": 3,
     "merge_recommendation": "修复后合并（需修复P0问题）",
     "key_issues": [
       "SQL注入: AlgorithmCallRecordMapper使用`${dimension}`拼接SQL",
-      "CORS配置允许所有来源",
-      "数据库密码硬编码",
-      "导出功能不完整",
-      "ThreadPoolTaskExecutor使用无界队列"
+      "CORS配置允许所有来源(CorsConfig.allowedOrigins('*'))",
+      "导出功能不完整: ExportServiceImpl仅创建PENDING记录,缺少异步执行和文件生成",
+      "@Async埋点caller信息丢失: TrackingServiceImpl中RequestContextHolder在异步线程失效"
     ]
   }
 }
