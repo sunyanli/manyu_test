@@ -1,0 +1,45 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: todo-app
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/ant_todo?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: ${DB_USERNAME:todo}
+    password: ${DB_PASSWORD:todo}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      connection-timeout: 1000
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    default-statement-timeout: 3
+
+management:
+  endpoints:
+    web:
+      base-path: /api/actuator
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+todo:
+  create:
+    # 总开关，关闭后新增接口直接返回 TODO_007
+    enabled: true
+    # 按租户尾号灰度，关闭表示全量
+    gray-enabled: false
+    gray-tenant-suffix:
+      - "0"
+      - "1"
+      - "2"
+    # 单用户限流阈值（QPS）
+    rate-limit-qps: 10
+  security:
+    # 受信登录网关 IP 白名单，为空表示由网络层保证只有网关可达
+    trusted-gateway-ips: []
