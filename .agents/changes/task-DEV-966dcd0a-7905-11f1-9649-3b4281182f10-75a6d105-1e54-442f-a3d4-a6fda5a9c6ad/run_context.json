@@ -1,0 +1,28 @@
+{
+  "change_id": "task-DEV-966dcd0a-7905-11f1-9649-3b4281182f10-75a6d105-1e54-442f-a3d4-a6fda5a9c6ad",
+  "stage": "review",
+  "skill": "dtazziboot-java-code-review",
+  "reviewed_commit": "61a3d8a",
+  "reviewed_files": 30,
+  "blocker_count": 2,
+  "p1_count": 3,
+  "p2_count": 7,
+  "merge_advice": "阻止合并",
+  "report_path": ".agents/20261029-目标_帮助用户记录日常待办事项_核心功能/cr_report.md",
+  "checklist_path": ".agents/20261029-目标_帮助用户记录日常待办事项_核心功能/2026-10-29-todo-create-cr-checklist.md",
+  "test_baseline": "mvn -o test: Tests run 64, Failures 0, Errors 0, BUILD SUCCESS",
+  "blockers": [
+    {
+      "id": "P0-1",
+      "rule": "G8.5",
+      "location": "src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java:69-78",
+      "issue": "开关/灰度校验抛异常时 afterCompletion 不回调，OperatorContext ThreadLocal 残留（已实测复现 PROBE_RESULT_LEAKED=true）"
+    },
+    {
+      "id": "P0-2",
+      "rule": "S8.1 / design R11",
+      "location": "src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java:43-48",
+      "issue": "受信网关 IP 白名单为空（默认配置）时跳过来源校验，X-User-Id/X-Tenant-Id 可被伪造，越权代表他人创建"
+    }
+  ]
+}
