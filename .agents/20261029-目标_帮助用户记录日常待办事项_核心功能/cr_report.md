@@ -1,10 +1,12 @@
 # Code Review Report
 
-> **Change** `todo-create`（新增待办事项最小闭环） · **分支/Commit** `task/DEV-966dcd0a-7905-11f1-9649-3b4281182f10-27fdbcad-6a5f-4d77-a539-94db5a84337e` / `009d45d` · **日期** `2026-10-29` · **审查者** AI
+> **Change** `todo-create`（新增待办事项 · 修复后复审 Round 2） · **分支/Commit** `task/DEV-966dcd0a-7905-11f1-9649-3b4281182f10-27fdbcad-6a5f-4d77-a539-94db5a84337e` / `4b2f55c`（范围 `0625c2a..HEAD`：编码 `009d45d` → 评审 `af9c663` → 修复 `4b2f55c`） · **日期** `2026-10-29` · **审查者** AI
 >
-> **AI**：等级 **P0 / P1 / P2**；G/S 以 checklist 行内定义为准；Bug 模式 Blocker→P0、Major→P1、Info→P2。已**先**运行 `scan-all-rules.sh`（输出见 §4/§5 备注），再出 LLM 结论。
+> **规则**：等级 **P0 / P1 / P2**；G/S 以 checklist 行内定义为准；Bug 模式 Blocker→P0、Major→P1、Info→P2。已**先**运行 `scan-all-rules.sh`（输出并入 §5），再出 LLM 结论。每条问题含 `ID + path:line` + 代码片段。
 >
-> **变更驱动源**：`.agents/20261029-目标_帮助用户记录日常待办事项_核心功能/2026-10-29-todo-create-cr-checklist.md`（Step1–Step5 逐 ID 核销已完成，`⬜ 待审 = 0`）。
+> **驱动清单**：`.agents/20261029-目标_帮助用户记录日常待办事项_核心功能/2026-10-29-todo-create-cr-checklist-round2.md`（45 个 Java 文件逐文件核销，`⬜` = 0）
+>
+> **验证证据**：`mvn -o -B test` → **Tests run: 111, Failures: 0, Errors: 0, Skipped: 0**（9 个测试类，surefire 报告实测，见 §7.3）；`src` 全量行宽（CJK 按 2 计）**0 处 > 120**、**0 处 Tab**。HTTP 运行时冒烟因离线仓库缺插件依赖被阻断，已降级（见 §7.3）。
 
 ---
 
@@ -12,24 +14,25 @@
 
 | 项 | 值 |
 |----|-----|
-| `.java` 文件数 | `39`（主代码 33 + 测试 6） |
-| 变更行数 | `+4680 / -0`（全部为新增文件） |
-| 非 Java 变更 | `pom.xml`、`application.yml`、`TodoItemMapper.xml`、`db/todo_item.sql`、`docs/*`、`.agents/*`（作证据引用，不计入 Java 队列） |
+| `.java` 文件数 | `45`（主代码 36 / 测试 9） |
+| 变更行数（全量 `0625c2a..HEAD`） | `+3196 / -0` |
+| 修复轮增量（`009d45d..HEAD`） | `+1827 / -258`（34 文件） |
+| 非 Java 变更 | `pom.xml`、`src/main/resources/application.yml`、`resources/mapper/TodoItemMapper.xml`、`resources/db/todo_item.sql`、`docs/*`、`.agents/*` |
 
 | 类/接口 | 路径 | 角色 |
 |---------|------|------|
-| `TodoController` | `src/main/java/com/antdigital/todo/controller/TodoController.java` | W01 入口 `POST /api/todo/item/create` |
-| `TodoExceptionHandler` | `src/main/java/com/antdigital/todo/controller/TodoExceptionHandler.java` | 异常 → 错误码 + HTTP 状态 |
-| `TodoService`/`TodoServiceImpl` | `src/main/java/com/antdigital/todo/service/` | S01 创建编排 / S02 幂等查询 |
-| `TodoValidator` | `.../service/component/TodoValidator.java` | S03 校验与规范化（R01–R04） |
-| `TodoNoGeneratorImpl` / `SnowflakeSequenceProvider` | `.../service/component/` | S04 编号生成 + 取号降级 |
-| `TodoRateLimiter` | `.../service/component/TodoRateLimiter.java` | R11 单用户限流 |
-| `GatewayAuthIntegrationImpl` | `.../integration/impl/` | I01 身份解析（R05） |
-| `AuditIntegrationImpl` | `.../integration/impl/` | I02 审计异步投递（R10） |
-| `TodoItemManager` | `.../dao/manager/TodoItemManager.java` | 唯一键冲突语义转换 |
-| `TodoItemMapper` / `TodoItemMapper.xml` | `.../dao/mapper/` + `resources/mapper/` | `#{}` 参数化 SQL |
-| `TodoItemDO` | `.../dao/entity/TodoItemDO.java` | 数据对象 + 查询条件载体 |
-| 其余枚举/常量/工具/DTO/VO | `common/**`、`model/**` | 支撑类型 |
+| `TodoApplication` | `src/main/java/com/antdigital/todo/TodoApplication.java` | 启动装配（`@MapperScan`） |
+| `TodoController` | `.../controller/TodoController.java` | W01 入口 `POST /api/todo/item/create` |
+| `TodoExceptionHandler` | `.../controller/TodoExceptionHandler.java` | 异常 → 错误码 + HTTP 状态 |
+| `TodoService` / `TodoServiceImpl` | `.../service/` | S01 创建编排 / S02 幂等查询 |
+| `TodoValidator` / `TodoTextUtil` | `.../service/component/`、`.../common/util/` | S03 校验与规范化（R01~R04） |
+| `TodoNoGenerator(Impl)` / `TodoSequenceProvider` / `SnowflakeSequenceProvider` | `.../service/component/` | S04 取号（R09，降级路径） |
+| `TodoCreateGate` / `TodoRateLimiter` / `TodoMetrics` | `.../service/component/` | 开关灰度（§7.2/§7.3）、限流（R11）、埋点（§6.5） |
+| `AuthIntegration` / `GatewayAuthIntegrationImpl` / `GatewaySignatureVerifier` | `.../integration/` | I01 身份与租户注入、网关签名校验（R05/R06） |
+| `AuditIntegration(Impl)` | `.../integration/` | I02 审计异步投递（R10） |
+| `TodoItemMapper` / `TodoItemManager` / `TodoItemDO` | `.../dao/` | 持久化 + 唯一键语义转换 |
+| DTO/VO/枚举/异常/常量 | `model/**`、`common/**` | 契约与常量 |
+| 9 个测试类 | `src/test/java/com/antdigital/todo/` | 单测（111 用例） |
 
 ---
 
@@ -37,79 +40,30 @@
 
 | P0 | P1 | P2 |
 |----|----|-----|
-| 3 | 6 | 10 |
+| 0 | 6 | 11 |
 
-> `scan-all-rules.sh` 原始预扫 10 条（P0=7 / P1=1 / P2=2），复核后 **7 条 `G16.2 CatchWithoutLogging` 为误报**（脚本仅匹配 `log.*` 变量名，本仓库统一使用 `LOGGER`，逐条核对 catch 内均有日志），不计入计数。上表为 LLM 复核后的最终结论。
+> **`blocker_count = 0`**（无阻塞项）。
+> 预扫 `scan-all-rules.sh` 原始命中 14 条（全为 `G16.2 CatchWithoutLogging`），逐条复核 **14/14 误报**（catch 内均有 `LOGGER.error/warn` 并转换异常或计数告警），不计入上表。上表为 LLM 复核后的最终结论。
 
 ---
 
 ## 3. Step 2 — 功能（REQ）
 
-### REQ-1: `F01 新增待办事项（名称 + 描述落库）`
-
-| Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
-|----------|------|----------|----------|------|
-| Given 合法入参与可信身份，When 调用 W01，Then 落库一条 `todo_item` 并返回 `todoNo`/`status=0`/`gmtCreate` | ✅ | design §5.1.2 W01「POST /api/todo/item/create」；§5.1.3.1 时序图；R08 | `TodoServiceImpl.java:104-150`、`TodoItemMapper.xml:42-51`、`TodoServiceImplTest#should_createTodo_when_validRequest` | 编排顺序与设计时序图一致 |
-
-### REQ-2: `F02 创建入参校验与规范化`
-
-| Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
-|----------|------|----------|----------|------|
-| Given 名称/描述，When 校验，Then 名称 trim 后 1~128 字符、描述 0~512 字符、NFC 规范化 + 剔除控制字符（保留 `\n`/`\t`），超长**不截断**直接报错 | ✅ | R02/R03/R04、A05「≤128 / ≤512 字符（按字符计，非字节）」、S03 | `TodoValidator.java:69-92`、`TodoTextUtil.java:46-123`、`TodoValidatorTest`（含 128/129、512/513、emoji、全角空格） | 按 code point 计长，emoji 计 1 |
-
-### REQ-3: `F03 创建幂等防重`
-
-| Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
-|----------|------|----------|----------|------|
-| Given 同一 `tenantId+requestId` 先查后写，When 已存在，Then 返回首次结果且 `idempotent=true` | ✅ | R07、§5.1.3.1 时序图「alt 幂等命中」 | `TodoServiceImpl.java:111-116`、`TodoItemMapper.xml:32-40` | 查询强制带 `tenant_id` |
-| Given 并发重复提交，When 插入触发 `uk_todo_item_req`，Then 重查并返回首次结果 | ⚠️ | §5.1.3.1「唯一键冲突 → 重查返回首次结果，`idempotent=true`，不向用户报错」 | `TodoServiceImpl.java:123-135`、`TodoItemManager.java:76-89` | 分支正确，但**依赖 DB 错误文案解析索引名**，解析失败会降级为「编号冲突重试」→ 见 P1-3 |
-
-### REQ-4: `F04 创建结果回执与操作留痕`
-
-| Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
-|----------|------|----------|----------|------|
-| Given 创建成功，When 组装回执，Then 返回 id/todoNo/itemName/itemDesc/status/creatorId/gmtCreate/idempotent | ⚠️ | W01 出参表（`data.id` 类型 `Long`、`data.gmtCreate` 格式 `yyyy-MM-dd HH:mm:ss`） | `TodoController.java:82-94`、`TodoCreateVO.java:16,46` | 字段齐全、时间格式一致；`data.id` 以 **String** 返回与系分表 `Long` 不符 → P2-4 |
-| Given 创建成功，When 留痕，Then 写审计（操作人/编号/结果），审计失败不阻断 | ⚠️ | R10、I02 | `TodoServiceImpl.java:143,256-263`、`AuditIntegrationImpl.java:74-80` | 异步 + 队列满降级 ✅；但审计在事务内发出且降级无告警 → P1-2、P1-5 |
-
-### REQ-5: `F05 创建人身份与租户隔离注入`
-
-| Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
-|----------|------|----------|----------|------|
-| Given Body 携带同名字段，When 创建，Then 身份/租户只取登录上下文，Body 字段被忽略 | ✅ | R05「只取网关注入的登录上下文，忽略 Body 中的同名字段」 | `TodoCreateRequest.java`（无身份字段）、`TodoServiceImpl.java:224-229` | 契约层根本未暴露身份字段 |
-| Given 网关注入身份头，When 解析，Then 得到可信 `userId/userName/tenantId/roles` | ⚠️ | R05、§6.4.2.1 | `GatewayAuthIntegrationImpl.java:50-75` | 直接读 `X-User-Id`/`X-User-Tenant-Id`/`X-User-Roles` → P0-1 |
-| Given 上下文缺失，Then 返回 TODO_0005 | ⚠️ | R05「若上下文缺失 → TODO_0005」 | `TodoServiceImpl.java:187-194`、`GatewayAuthIntegrationImpl.java:56-58,70-73` | `userId` 缺失 → TODO_0005 ✅；**`tenantId` 缺失静默回落 `"0"`** → P1-1 |
-| Given 无「待办-创建」权限点，Then 返回 TODO_0006 | ⚠️ | R06「通过统一权限平台配置权限点，服务端以注解 + 权限点方式校验」 | `TodoServiceImpl.java:201-210` | 判定源为请求头 `X-User-Roles`，非权限平台 → P0-1 |
-
-### REQ-6: `R11 单用户创建限流`
-
-| Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
-|----------|------|----------|----------|------|
-| Given 同一用户 1 分钟超 30 次，Then 返回 TODO_0009 | ⚠️ | R11「默认 30 次/分钟（可配置）」；§6.3「本地 + 网关双层」 | `TodoRateLimiter.java:66-76`、`application.yml:29-32` | 滑动窗口本身正确；配置项未接线（P2-3）、单实例口径放大限额（P1-6） |
-
-### REQ-7: `错误码与异常契约`
-
-| Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
-|----------|------|----------|----------|------|
-| Given 各类失败，When 返回，Then 错误码 TODO_0001~0009 与 HTTP 状态符合 W01 错误码表，不泄露堆栈 | ⚠️ | §5.1.2 错误码表、§5.1.3.1 异常场景表 | `TodoExceptionHandler.java:56-127,169-187`、`TodoErrorCodeEnum.java` | 9 个错误码齐全、映射基本一致；未知异常统一映射 TODO_0008 → P2-2 |
-
-### REQ-8: `可灰度 / 可应急（配置中心开关）`
-
-| Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
-|----------|------|----------|----------|------|
-| Given 发布期，When 运营灰度，Then 按 `todo.create.gray.tenants` 尾号灰度 10%→50%→100% | ❌ | §7.2「灰度开关：`todo.create.gray.tenants` + `todo.create.enabled`」 | 无实现（`rg` 全 `src/main` 无 `todo.create.enabled`/gray 相关代码，`application.yml` 仅有限流配置） | P0-2 |
-| Given 线上故障，When 一级应急，Then 关闭 `todo.create.enabled` 立即止血（无需回滚） | ❌ | §7.3「一级应急（优先，无需回滚）：配置中心关闭 `todo.create.enabled` 总开关」 | 同上 | P0-2 |
-
-### REQ-9: `可监控 / 告警`
-
-| Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
-|----------|------|----------|----------|------|
-| Given 线上运行，When 观测，Then 埋点 `todo_create_total`/`todo_create_cost_ms`/`todo_create_idempotent_hit_total`/`todo_create_rate_limited_total`/`todo_no_degrade_total` 支撑 §6.5 五条告警 | ❌ | §6.5、§7.1 | `TodoServiceImpl.java` 全链路仅 SLF4J 日志；`rg` 无 `MeterRegistry`/`Counter`/actuator 依赖（`pom.xml`） | P0-3 |
-
-### REQ-10: `R09 编号冲突重试`
-
-| Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
-|----------|------|----------|----------|------|
-| Given 编号唯一键冲突，When 插入失败，Then 重试 1 次取新号；仍冲突返回 TODO_0007 | ✅ | R09、S04 | `TodoServiceImpl.java:119-149`、`TodoConstants.java:66` | `should_throwTodoNoConflict_when_todoNoAlwaysConflicts` 断言插入恰好 2 次 |
+| REQ | Scenario | Spec证据 | 代码证据 | 结果 |
+|-----|----------|----------|----------|------|
+| REQ-1 | Given 合法入参与可信身份，When 调用 W01，Then 落库一条 `todo_item` 并返回 `id/todoNo/status=0/gmtCreate` | design §4.1 W01、§5.1.2、§5.1.3.1 时序图 | `TodoController.java:68-74`、`TodoServiceImpl.java:149-194`、`TodoItemMapper.xml:54-63`；`TodoServiceImplTest#should_createTodo_when_validRequest` | ✅ |
+| REQ-2 | Given 名称/描述/requestId，When 校验，Then trim(含全角)+NFC+剔除控制字符后名称 1~128、描述 0~512、requestId 字母数字`-_`且 ≤64，**超长不截断** | design R01~R04、A05「按字符计，非字节」、S03 | `TodoValidator.java:35-106`、`TodoTextUtil.java:46-123`；`TodoValidatorTest` 22 例、`TodoTextUtilTest` 12 例 | ✅ |
+| REQ-3 | Given 同一 `tenantId+requestId` 重复提交（含并发），Then 返回首次结果且 `idempotent=true`，不向用户报错 | design R07、§5.1.3.1 异常场景表「唯一键冲突 → 重查返回首次结果」 | `TodoServiceImpl.java:157-181`；`should_returnFirstResult_when_sameRequestIdSubmittedTwice`、`..._duplicateRequestIdRace`、`..._duplicateRequestIdRaceAndConstraintUnknown` | ⚠️ 并发 ≥3 同 `requestId` 存在锁升级死锁（**P1-1**） |
+| REQ-4 | Given 创建成功，When 事务提交后，Then 异步写审计（requestId/todoNo/operatorId），失败不阻断 | design R10、§4.4 I02、§5.1.3.1「审计在事务外/异步」 | `TodoServiceImpl.java:311-339`（`afterCommit`）、`AuditIntegrationImpl.java:88-96`；`should_stillSucceed_when_auditThrows` | ✅ |
+| REQ-5 | Given 网关注入身份/租户/权限，When 创建，Then 只取可信上下文，缺失 TODO_0005，无权限点 TODO_0006 | design R05/R06、§6.4.2.1~6.4.2.3 | `GatewayAuthIntegrationImpl.java:65-83`、`TodoServiceImpl.java:253-276`；`TodoControllerTest` 7 例、`GatewaySignatureVerifierTest` 7 例 | ✅（头部大小写健壮性见 **P1-2**） |
+| REQ-6 | Given 客户端传 `status`/`is_deleted`/`source`，Then 服务端固定 `status=0`/`is_deleted=0`，`source` 缺省 `web` 且「不接受前端指定」 | design R08 | `TodoServiceImpl.java:294-298`（status/deleted 强制）；`TodoValidator.java:100-106`（source 取客户端值） | ⚠️ spec 自身矛盾：W01 入参表允许 `source`，R08 禁止 → **P1-6** |
+| REQ-7 | Given 编号冲突，Then 重试 1 次取新号；仍冲突 TODO_0007；编号格式 `TD+yyyyMMdd+6位` | design R09、A09、S04 | `TodoServiceImpl.java:166-193`、`TodoNoGeneratorImpl.java:77-85`；`should_retryAndSucceed_when_todoNoConflictOnce`、`should_throwTodoNoConflict_when_todoNoAlwaysConflicts`、`TodoNoGeneratorImplTest` 3 例 | ✅ |
+| REQ-8 | Given 单用户 1 分钟超 30 次，Then TODO_0009 | design R11、§6.3 | `TodoRateLimiter.java:52,73-84`；`should_throwRateLimited_when_exceedsLimit` | ✅（性能 P2-5） |
+| REQ-9 | Given 总开关关闭或租户未命中灰度，Then TODO_0010（503）且不落库 | design §7.2、§7.3 | `TodoCreateGate.java:68-81`、`TodoServiceImpl.java:151`、`application.yml:34-42`；`TodoCreateGateTest` 4 例 + `TodoServiceImplTest` 3 例 | ✅（口径 P2-7） |
+| REQ-10 | Given 创建链路，When 成功/失败/幂等/限流/降级，Then 上报 §6.5 五项指标支撑 5 条告警 | design §6.5、§7.1 | `TodoMetrics.java:114-198`、`TodoServiceImpl.java:127-139`、`pom.xml:49-57`、`application.yml:49-56` | ⚠️ `todo_no_degrade_total` 恒计数致告警失效 → **P1-3** |
+| REQ-11 | Given 建表脚本，Then 字段/唯一索引/查询索引与 §5.1.1.1 一致 | design §5.1.1.1 | `todo_item.sql:5-27`、`TodoItemDO.java:16-206`（索引名与 `TodoDuplicateKeyException` 常量一致） | ✅（软删语义 P2-4） |
+| REQ-12 | Given 创建成功，Then `data.id` 为 String、`gmtCreate` 为 `yyyy-MM-dd HH:mm:ss`、`code=OK/msg=SUCCESS` | design §5.1.2 W01 出参表（修订版 `data.id` String） | `TodoController.java:82-94`、`ApiResult.java:56-69`；`should_returnSuccessResult_when_validRequest` | ✅ |
+| REQ-13 | Given 日志/审计输出，Then 不含 `itemName`/`itemDesc` 原文，敏感信息脱敏且截断 | design §6.4.3.2 | `TodoServiceImpl.java:160-190`（仅 requestId/todoNo/creatorId）、`TodoItemDO.java:192-205`、`DesensitizeUtil.java:58-66` | ✅ |
 
 ---
 
@@ -117,19 +71,28 @@
 
 | 结果 | 说明（违规写 Ax.x 与 `path:行`） |
 |------|--------------------------------|
-| ⚠️ | A1 ✅ 文件命名/UTF-8/无 Tab；A2 ✅ 无 `import *`、static import 独立分组；A3 ⚠️ **A3.4 行宽 >120**：`GatewayAuthIntegrationImpl.java:74`(121)、`TodoValidatorTest.java:67`(121)、`TodoValidatorTest.java:133`(134)（P2-7）；A4 ✅ 命名规范；A5 ✅ `@Override` 齐全、无空 catch；A6 ✅ `switch` 有 `default`、`long` 字面量大写 `L`；A7 ✅ Javadoc 完整且标记顺序正确 |
-
-> 预扫 A3.4 命中 2 处，人工复核补出 `TodoValidatorTest.java:67`（脚本遗漏）。
+| ⚠️ | **A2.4**（P2-11）：`java.*` import 组排在 `org.*` 之后，未按完整名 ASCII 升序 —— `TodoServiceImpl.java:23-30`、`TodoCreateGate.java:6-14`、`GatewaySignatureVerifier.java:7-19`、`TodoMetrics.java:5-8`（全仓库一致，统一整改） |
+| ✅ | **A1** 文件名=顶层类名、UTF-8、全量 `src` 0 处 Tab |
+| ✅ | **A3** K&R 大括号、4 空格缩进、行宽 ≤120（显示宽度复核 0 处超限，修复轮 P2-7 已闭环）、成员间空行 |
+| ✅ | **A4** 包全小写、类 UpperCamel、方法 lowerCamel、常量 UPPER_SNAKE、测试类 `XxxTest`（`DEFAULT_RATE_LIMIT_PER_MINUTE` 属未引用常量，见 P2-6） |
+| ✅ | **A5** `@Override` 齐备（`TodoServiceImpl.java:124,204,317`、`AuditIntegrationImpl.java:88,101`）、无空 catch、无 `finalize()` |
+| ✅ | **A6** `switch` 均有 `default`（`TodoExceptionHandler.java:155-174`）、long 字面量大写 `L`（`TodoConstants.java:73,158,163`）、修饰符顺序正确 |
+| ✅ | **A7** public 类/方法 Javadoc 完整，`@param → @return → @throws` 顺序正确，自解释 getter 省略符合 A7.3 |
 
 ---
 
 ## 5. Step 4 — 可靠性检查
 
-| 域 | 参考 | 结果 | 等级 | 说明（列命中 ID 或「已扫无命中」） |
-|----|------|------|------|-------------------------------------|
-| 可靠性 | `reliability-checklist.md` G1–G17 | ❌ | P0–P2 | 命中：**G17.1/G15.3/G12.2 缺失→P0-2**、**G16.1 缺失→P0-3**、G3.2→P1-2、G8.1→P1-5、G6.1→P2-5、G11.2→P2-9、G10.1→P2-2、G14.3→P2-1；G2.1/G2.2/G2.3/G4.*/G9.2/G14.2/G15.1/G16.2~G16.4 通过 |
-| 安全 | `security-checklist.md` S1–S10 | ❌ | P0–P1 | 命中：**S8.1（身份/权限信任客户端头）→P0-1**、S8.1/G14.2（tenantId 回落）→P1-1；S1.1 全 `#{}` 通过、S9.1/S9.2/S9.3 通过、S6.2 通过；S2–S5/S7/S10 与变更无关 N/A |
-| Bug 模式 | `bug-pattern-checklist.md` B/M/I（120） | ⚠️ | P0–P2 | 预扫：`scan-all-rules.sh` → `[P1] M016 TodoServiceImpl.java:220`、`[P2] A3.4 ×2`、7 条 `G16.2` 误报复核排除；LLM 逐条核销 120 条：B001–B081 / M001–M027 / I001–I010 **无 Blocker/Major 命中**，仅 `M016`（默认时区）→P2-1；`B008` 未用 `Executors`（审计用裸 `Thread` + 有界队列）通过 |
+> **预扫（先执行）**：`bash references/script/scan-all-rules.sh src/main/java/com/antdigital/todo src/test/java/com/antdigital/todo src/main/resources/mapper/TodoItemMapper.xml src/main/resources/db/todo_item.sql`
+> 输出：`14 findings (P0=14, P1=0, P2=0) | 52/222 rules scanned`，全部 `G16.2 CatchWithoutLogging`。
+> **复核：14/14 误报** —— `TodoItemManager.java:73`、`AuditIntegrationImpl.java:106/130/138`、`GatewaySignatureVerifier.java:148/166`、`SnowflakeSequenceProvider.java:142`、`TodoServiceImpl.java:132/135/170/182/334`、`TodoControllerTest.java:185`、`GatewaySignatureVerifierTest.java:135` 的 catch 块内均记录 `LOGGER.error/warn` 并转换为业务异常或计数告警（脚本按 catch 后首行正则匹配，未识别日志语句形态）。
+
+| 域 | 参考 | 结果 | 等级 | 说明（命中 ID + 定位） |
+|----|------|------|------|----------------------|
+| 可靠性 | `reliability-checklist.md` G1–G18 | ⚠️ | P1 | `G1.1` 幂等回查 `FOR UPDATE` 锁升级死锁（`TodoServiceImpl.java:170-172` + `TodoItemMapper.xml:43-52`）；`G8.2` 线程池/信号量隔离缺失（`TodoServiceImpl.java:124-126`、`application.yml` 无相关项）；`G16.1` 降级指标恒计数（`SnowflakeSequenceProvider.java:125`）；其余 G 项已扫无命中，明细见 checklist §4.2 |
+| 安全 | `security-checklist.md` S1–S10 | ⚠️ | P1 | `S8.1` 签名不绑定 method/path/body 且无 nonce，300s 内可重放（`GatewaySignatureVerifier.java:109-137`）；请求头大小写不敏感获取缺失（`GatewayAuthIntegrationImpl.java:69-77`）；密钥配置化 + fail-closed 已达标（`GatewaySignatureVerifier.java:113-117`）；S1.1 全 `#{}`、S6.2 无多态、S9.2 日志脱敏通过；S2~S5/S7/S10 本变更不涉及 `N/A` |
+| Bug 模式 | `bug-pattern-checklist.md` B/M/I（120 条） | ✅ | — | 预扫 + LLM 逐条核销 120 条未发现命中：`B076`（`@Transactional` public）、`M016`（显式时区）、`M020`（`@Override`）、`B053/B080`（异常断言齐全）、`B008`（未用 `Executors`）、`B055`（未用 Mockito）均专项通过；逐条状态见 checklist §4.1 |
+| 数据库设计 | design §5.1.1.1 / db 规范 | ⚠️ | P2 | 唯一索引 `uk_todo_item_req(tenant_id, request_id)` 不含 `is_deleted`，而幂等查询过滤 `is_deleted = 0`：启用逻辑删除后同 `requestId` 重建会被误报 TODO_0007（`todo_item.sql:22` + `TodoItemMapper.xml:47-49`） |
 
 ---
 
@@ -137,405 +100,484 @@
 
 | 域 | 参考 | 结果 | 等级 | 说明 |
 |----|------|------|------|------|
-| 自定义扩展 | `customized-checklist.md` U* | N/A | — | `N/A(未启用自定义规则)`；示例项 U1.1（Controller 必须 `@Valid`）实际已满足（`TodoController.java:69`） |
+| 自定义扩展 | `customized-checklist.md` U* | ✅ / N/A | — | `U1.1` Controller 入参使用 `@Valid` + `@NotBlank`（`TodoController.java:69`、`TodoCreateRequest.java:21-28`）；`U1.2~U2.3` 为示例项/空节 → `N/A(未启用自定义规则)` |
 
 ---
 
 ## 7. 结论
 
-- **合并建议**：**阻止合并**（存在 3 项 P0）
-- **P0**：
-  1. **P0-1** `S8.1` — 身份与权限完全信任客户端可控的请求头，`R06` 权限平台校验未落地，服务直接可达时可伪造 `X-User-Id`/`X-User-Roles` 越权创建。
-  2. **P0-2** `G17.1`/`G15.3`/`G12.2` — 缺 `todo.create.enabled` 总开关与 `todo.create.gray.tenants` 灰度，系分 §7.2/§7.3 的一级应急与灰度策略无法执行。
-  3. **P0-3** `G16.1` — 全链路无指标埋点，系分 §6.5 的 5 条告警与 §7.1 的依赖/业务埋点无法建立，线上变更「不可监控」。
-- **P1/P2**：
-  1. **P1-1** `S8.1`/`G14.2` — `tenantId` 缺失静默回落 `"0"`，与 R05「上下文缺失 → TODO_0005」冲突，未注入租户的请求会写入共享租户 0。
-  2. **P1-2** `G3.2` — 审计投递位于 `@Transactional` 方法内，事务后续回滚时仍会留下「创建成功」审计。
-  3. **P1-3** `G2.2`/`G9.3` — 唯一键冲突类型依赖 DB 错误文案 `contains` 判断，解析失败时幂等键冲突被误当编号冲突，重试耗尽后返回 TODO_0007 而非首次结果。
-  4. **P1-4** `G1.1`/`G2` — 雪花取号默认全实例 `workerId=0/datacenterId=0`，且再经 6 位取模压缩，多实例高并发下 `todo_no` 碰撞概率高，与「多实例下不重复」设计目标不符。
-  5. **P1-5** `G8.1`/`G16.2` — 审计降级仅写本地 ERROR 日志、无告警，未满足 R10「ERROR 日志 + 监控告警」。
-  6. **P1-6** 功能偏差 — 限流为纯本地单实例口径，多副本部署下单用户实际额度放大约 N 倍，与 R11「30 次/分钟」及 §6.3「本地 + 网关双层」不符（网关层限流未在本仓库落地也未在文档标注为外部待办）。
-  7. **P2-1** `M016`/`G14.3` — `LocalDateTime.now()`/`LocalDate.now()` 依赖 JVM 默认时区。
-  8. **P2-2** `G10.1` — 未知异常统一映射 TODO_0008「创建失败，请稍后重试」，参数错误与系统异常语义混用。
-  9. **P2-3** — `todo.create.rate-limit-per-minute` 配置项未接线，`TodoRateLimiter` 恒用常量 30。
-  10. **P2-4** — `data.id` VO 层为 String，与系分 W01 出参表 `Long` 不一致（需同步修订文档或契约）。
-  11. **P2-5** `G6.1` — 限流器 `Map<String, Deque<Long>>` 无用户维度淘汰，长期存在内存增长风险。
-  12. **P2-6** — 审计 shutdown 时队列剩余事件直接丢弃，无告警计数。
-  13. **P2-7** `A3.4` — 3 处行宽超 120 字符。
-  14. **P2-8** — 未使用常量 `TODO_NO_FALLBACK_SUFFIX_LENGTH`、`SNOWFLAKE_WORKER_ID_BITS` 与已剥离的降级文案，存在死代码。
-  15. **P2-9** `G11.2` — 测试缺口：跨租户隔离、索引名不可识别的冲突分支、`/create` 缺 `requestId` 的 HTTP 错误码映射无覆盖。
-  16. **P2-10** — `SnowflakeSequenceProvider.waitUntil` 纯自旋忙等，时钟回拨/同毫秒耗尽时占用 CPU。
-- **一句话**：主链路（校验 → 幂等 → 取号 → 落库 → 回执）实现与系分一致、单测覆盖到位、SQL 全参数化、日志脱敏到位；但**可运维三支柱（可监控/可灰度/可应急）整体缺失**，且身份与权限判定建立在客户端可控请求头上，属安全红线，需先修 P0 再合入。
+- **合并建议**：**修复后合并**（无 P0；6 项 P1 建议合并前修复，11 项 P2 可选）
+- **P0**：无。上轮 P0-1（身份可伪造）、P0-2（无开关灰度）、P0-3（无指标）均已闭环，复核证据见 §7.2。
+
+- **P1**：
+  1. **P1-1** `G1.1`/`G9.3` `TodoServiceImpl.java:170` — 唯一键冲突后在已持共享锁的事务内做 `FOR UPDATE` 回查，两个并发同 `requestId` 事务形成锁升级死锁，最终返回 TODO_0011/500，违背 R07「返回首次结果」。
+  2. **P1-2** `S8.1`/`G10` `GatewayAuthIntegrationImpl.java:69` — 请求头按大小写精确查找；网关下发小写头（HTTP/2 强制小写）时 `userId`/`tenantId` 恒空 → 全量 TODO_0005，单测用精确大小写 `HashMap` 无法暴露。
+  3. **P1-3** `G16.1`/`G13.1` `SnowflakeSequenceProvider.java:125` — 唯一 provider 恒 `isDegraded()==true`，`todo_no_degrade_total` 恒等于创建量，§6.5「>10 次/分钟」告警永久触发，真实降级不可辨识。
+  4. **P1-4** `S8.1` `GatewaySignatureVerifier.java:131` — 签名不绑定 method/path/body 摘要且无 nonce，300s 窗口内可重放任意报文。
+  5. **P1-5** `G8.2` `TodoServiceImpl.java:126` — 系分 §6.3 要求的「创建接口独立线程池/信号量（默认 50 并发）」未实现，DB 变慢将占满容器工作线程。
+  6. **P1-6** `R08`/REQ-6 `TodoValidator.java:100` — `source` 由客户端指定并落库，与 R08「不接受前端指定」冲突（spec W01 入参表与 R08 自相矛盾，需澄清统一）。
+
+- **P2**：①成功指标/日志先于提交（`TodoServiceImpl.java:130`）；②非存储异常误记 `TODO_0008` 码（`:136`）；③指标每请求动态 `register`（`TodoMetrics.java:190`）；④唯一索引与软删查询错配（`TodoItemMapper.xml:49`）；⑤限流器请求路径 O(n) 全量扫描（`TodoRateLimiter.java:91`）；⑥死常量 `DEFAULT_RATE_LIMIT_PER_MINUTE`（`TodoConstants.java:68`）；⑦开关与灰度共用错误码/指标（`TodoCreateGate.java:68`）；⑧签名校验可配置关闭无生产防护（`application.yml:29`）；⑨重复请求头只留一值（`TodoController.java:70`）；⑩审计停机中断后统计偏差（`AuditIntegrationImpl.java:110`）；⑪import 分组顺序（A2.4）。
+
+- **一句话**：主链路与安全基线（签名 fail-closed、幂等唯一索引、开关灰度、审计事务后投递、指标埋点）已达标、111 个单测全绿、无阻塞缺陷；剩余风险集中在「并发幂等的死锁路径」「网关契约健壮性/抗重放」「可监控口径失真」，均可局部修复，建议按 §8 清单收尾后合并。
+
+### 7.2 修复轮（Round 1 → Round 2）逐项复核
+
+| 上轮问题 | 复核证据 | 结论 |
+|----------|----------|------|
+| P0-1 身份/权限信任客户端头 | `GatewaySignatureVerifier.java:109-137`（HMAC-SHA256 + 时间戳容差 + `MessageDigest.isEqual` 常量时间比较）；`GatewayAuthIntegrationImpl.java:69-82`（先取头→再验签→才构造上下文）；`GatewaySignatureVerifier.java:113-117` 密钥缺失 fail-closed；`X-User-Roles` 已删除 | ✅ 闭环（健壮性见 P1-2/P1-4） |
+| P0-2 无开关/灰度 | `TodoCreateGate.java:68-81`（总开关 + 尾号白名单）；`application.yml:34-42`；`TodoServiceImpl.java:151`（身份后、权限前）；TODO_0010 独立错误码 + 503 | ✅ 闭环（口径见 P2-7） |
+| P0-3 无指标 | `TodoMetrics.java:22-198`（5 项主指标 + 灰度/审计降级）；`pom.xml:49-57`；`application.yml:49-56` 暴露 `prometheus` | ✅ 闭环（口径见 P1-3/P2-1/P2-3） |
+| P1-1 租户静默回落 | `GatewayAuthIntegrationImpl.java:71-75`、`TodoServiceImpl.java:253-260`：userId/tenantId 任一缺失即 TODO_0005，无默认回落；`TodoControllerTest#should_throwNotLogin_when_tenantHeaderMissing`、`should_throwNotLogin_when_tenantIdBlank` | ✅ 闭环 |
+| P1-2 审计在事务内 | `TodoServiceImpl.java:311-322` `TransactionSynchronizationManager.registerSynchronization(...afterCommit)`，无事务上下文直投 | ✅ 闭环 |
+| P1-3 冲突依赖错误文案 | `TodoServiceImpl.java:170-181`：先无条件按 `(tenant, requestId)` 加锁回查，命中即返回首次结果，索引名降级为日志诊断；`should_returnFirstResult_when_duplicateRequestIdRaceAndConstraintUnknown` 覆盖 | ✅ 功能闭环（并发死锁见 P1-1） |
+| P1-4 雪花节点硬编码 | `SnowflakeSequenceProvider.java:70-84` 配置注入 + 越界 `IllegalArgumentException` + 0/0 WARN；`application.yml:43-46` | ✅ 闭环 |
+| P1-5 审计降级无告警 | `AuditIntegrationImpl.java:92-95,113-117,133-136,138-142`：队列满/停机/中断/消费异常均计数 + ERROR | ✅ 闭环 |
+| P1-6 限流配置未接线 | `TodoRateLimiter.java:51-54` `@Value("${todo.create.rate-limit-per-minute:30}")`；`docs/modules/todo/README.md:89-94` 限流口径说明 | ✅ 闭环（性能见 P2-5） |
+| P2-1 默认时区 | `TodoConstants.java:138-143` `BIZ_ZONE`；`TodoServiceImpl.java:287`、`TodoNoGeneratorImpl.java:54` 显式时区 | ✅ 闭环 |
+| P2-2 未知异常误映射 | `TodoErrorCodeEnum.java:67` `TODO_0011`；`TodoExceptionHandler.java:123-127` | ✅ 闭环（指标侧见 P2-2） |
+| P2-3 限流配置未生效 | 同 P1-6 | ✅ 闭环 |
+| P2-4 `data.id` 契约不一致 | `TodoCreateVO.java:16` String + `design.md` W01 出参表已改为 String | ✅ 闭环 |
+| P2-5 限流器 Map 无界 | `TodoRateLimiter.java:91-104` 阈值触发回收 + `timestamps.remove(key, queue)` | ✅ 闭环（性能见 P2-5 本轮） |
+| P2-6 停机丢弃无计数 | `AuditIntegrationImpl.java:101-118` 先停拉取→join→超时中断→残留计数 + ERROR | ✅ 闭环（偏差见 P2-10） |
+| P2-7 行宽超限 | 显示宽度复核：`src` 全量 0 处 > 120 | ✅ 闭环 |
+| P2-8 死常量 | `SNOWFLAKE_WORKER_ID_BITS` / `TODO_NO_FALLBACK_SUFFIX_LENGTH` / `DEFAULT_TENANT_ID` 已删除 | ⚠️ 部分闭环：`DEFAULT_RATE_LIMIT_PER_MINUTE` 仍为死常量（P2-6） |
+| P2-9 测试缺口 | 新增 3 个测试类 + 5 个测试类扩充，111 用例全绿 | ✅ 闭环 |
+| P2-10 雪花忙等 | `SnowflakeSequenceProvider.java:135-149` 短 `sleep` + 回拨超 5s 快速失败 | ✅ 闭环 |
+
+### 7.3 验证与降级说明
+
+| 验证项 | 命令 | 结果 |
+|--------|------|------|
+| 单测（真实执行） | `JAVA_HOME=/opt/toolchain/zulu17.56.15-ca-jdk17.0.14-linux_x64 mvn -o -B test` | **BUILD SUCCESS**；surefire 9 个测试类：`SortUtilTest` 21、`TodoTextUtilTest` 12、`TodoControllerTest` 7、`TodoItemManagerTest` 5、`GatewaySignatureVerifierTest` 7、`TodoCreateGateTest` 4、`TodoNoGeneratorImplTest` 9、`TodoValidatorTest` 22、`TodoServiceImplTest` 24 → 合计 **111 / 0 / 0 / 0** |
+| 规则预扫 | `scan-all-rules.sh`（52/222 条） | 14 命中，复核 14 误报 |
+| 行宽 / Tab | Python 显示宽度统计（CJK=2）+ awk Tab 扫描 | 0 处 > 120、0 处 Tab |
+| HTTP 运行时冒烟 | `mvn -o spring-boot:run` / `dependency:build-classpath` | **未执行成功**：离线仓库缺少 `spring-boot-maven-plugin:2.7.18` 运行期依赖（`spring-boot-loader-tools`、`spring-boot-buildpack-platform`、`maven-shade-plugin`）且 `dependency` 插件不可用 → 降级为「单测 + 静态审查」，**未做真实 HTTP 探活** |
+| SQL / MyBatis 一致性 | 静态核对 | 字段与 `todo_item.sql` 全对齐、全 `#{}`、`useGeneratedKeys` 回填 `id`、索引名与 `TodoDuplicateKeyException` 常量一致 |
+
+> **未覆盖风险**（不阻塞本次结论，建议预发补验）：①真实 MySQL 下 `FOR UPDATE` 与 200 并发同 `requestId` 的幂等表现（P1-1 的修复验证依赖此项）；②网关侧签名载荷、请求头大小写的字节级一致性（P1-2/P1-4）；③`/actuator/prometheus` 实际抓取与告警阈值（P1-3）；④50 并发隔离落地后的容量表现（P1-5）。
 
 ---
 
 ## 7.1 问题片段（必填）
 
-### P0-1 `S8.1` — 身份与权限信任客户端可控请求头
+### P1-1 `G1.1`/`G9.3` — 幂等回查使用加锁读，并发同 `requestId` 存在锁升级死锁
 
-`src/main/java/com/antdigital/todo/integration/impl/GatewayAuthIntegrationImpl.java:50-75`
-
-片段范围：`src/main/java/com/antdigital/todo/integration/impl/GatewayAuthIntegrationImpl.java:50-75`
+**P1** `G1.1` `src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:170` — 插入因唯一键失败后，在**同一事务**内对同一唯一索引记录执行 `SELECT ... FOR UPDATE`。失败的 INSERT 已在唯一索引记录上持 S 锁，两个并发事务同时进入该分支即互相等待 S→X 升级，InnoDB 判定死锁回滚其一；异常被 `catch (RuntimeException)` 记为 `TODO_0008` 指标后原样抛出，最终返回 **TODO_0011 / 500**，违反 R07「重复请求返回首次结果」。
+片段范围：`src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:166-184`
 
 ```java
-L50|    public OperatorContext resolveOperator(Map<String, String> headers) {
-L51|        if (headers == null) {
-L52|            throw new TodoBizException(TodoErrorCodeEnum.NOT_LOGIN);
-L53|        }
-L54|        String userId = TodoTextUtil.trimWhitespace(headers.get(TodoConstants.HEADER_USER_ID));
-        // 问题：userId 直接取自请求头 X-User-Id，未校验网关签名/票据（auth.verify.enabled 默认 false 且只判票据非空）
-L70|        String tenantId = TodoTextUtil.trimWhitespace(headers.get(TodoConstants.HEADER_TENANT_ID));
-L74|        return new OperatorContext(userId, userName, tenantId, parseRoles(headers.get(TodoConstants.HEADER_USER_ROLES)));
-        // 问题：roles 取自 X-User-Roles，客户端可自行追加 "TODO_CREATE"/"*"，绕过 R06 垂直权限
+L166|for (int attempt = 0; attempt <= TodoConstants.TODO_NO_CONFLICT_RETRY_TIMES; attempt++) {
+L167|    TodoItemDO entity = buildEntity(validated, operator);
+L168|    try {
+L169|        todoItemManager.insert(entity);
+L170|    } catch (TodoDuplicateKeyException e) {
+L171|        // 索引名可能因驱动/版本差异无法解析，先无条件做幂等回查，避免误把幂等冲突当编号冲突
+L172|        TodoItemDO concurrent = selectByRequestIdForUpdate(validated.getRequestId(), operator);
+L173|        if (concurrent != null) {
+L174|            todoMetrics.recordIdempotentHit();
+L175|            LOGGER.info("todo create idempotent hit by duplicate key, requestId={}, todoNo={}, constraint={}",
+L176|                    validated.getRequestId(), concurrent.getTodoNo(), e.getConstraintName());
+L177|            return toResult(concurrent, true);
+L178|        }
+L179|        LOGGER.warn("todo item unique key conflict, retry with new no. todoNo={}, attempt={}, constraint={}",
+L180|                entity.getTodoNo(), attempt, e.getConstraintName());
+L181|        continue;
+L182|    } catch (RuntimeException e) {
+L183|        LOGGER.error("todo create storage error, requestId={}", validated.getRequestId(), e);
+L184|        throw new TodoBizException(TodoErrorCodeEnum.STORAGE_ERROR);
 ```
 
-配套：`src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:201-210`（`checkPermission` 的唯一判定源就是上述 `roles`）。**Spec 证据**：design R06「通过统一权限平台配置『待办-创建』权限点，服务端以注解 + 权限点方式校验」、§6.4.2.2「实现。通过统一权限平台配置…无权限返回 TODO_0006」，§6.4.2.3「默认全链路统一拦截器校验登录态…无白名单接口」。
+片段范围：`src/main/resources/mapper/TodoItemMapper.xml:43-52`
 
-### P0-2 `G17.1`/`G15.3`/`G12.2` — 无功能总开关与灰度
-
-`src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:104-110`
-
-片段范围：`src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:104-110`
-
-```java
-L104|    public TodoCreateResult createTodo(TodoCreateRequest request, OperatorContext operator) {
-L105|        validateOperator(operator);
-L106|        checkPermission(operator);
-L107|        todoRateLimiter.acquire(operator.getUserId());
-        // 问题：缺少 todo.create.enabled 总开关与 todo.create.gray.tenants 灰度判定，故障时只能回滚发布包
-L109|        ValidatedTodo validated = todoValidator.validateAndNormalize(request);
+```xml
+L43|<select id="selectByRequestIdForUpdate" resultMap="TodoItemResultMap">
+L44|    SELECT
+L45|    <include refid="BaseColumns"/>
+L46|    FROM todo_item
+L47|    WHERE tenant_id = #{tenantId}
+L48|    AND request_id = #{requestId}
+L49|    AND is_deleted = 0
+L50|    LIMIT 1
+L51|    FOR UPDATE
+L52|</select>
 ```
 
-配套：`src/main/resources/application.yml:29-32` 的 `todo.create` 下仅有 `rate-limit-per-minute`，无 `enabled`/`gray`。**Spec 证据**：design §7.2「灰度开关：配置中心 `todo.create.gray.tenants`（租户尾号列表）+ `todo.create.enabled`（总开关）」；§7.3「一级应急（优先，无需回滚）：配置中心关闭 `todo.create.enabled` 总开关」。
+> **Spec 证据**：design §5.1.3.1 R07「同一 `tenantId + requestId` 只允许创建一条待办，重复请求返回首次结果且 `idempotent=true`」；异常场景表「唯一键冲突（并发重复提交）→ 捕获后按 `request_id` 重查并返回首次结果，不向用户报错」。
+> **修复方向**：① 回查改为 `REQUIRES_NEW` 事务或独立普通读（去掉 `FOR UPDATE`）；② 单独捕获 `DeadlockLoserDataAccessException`/`CannotAcquireLockException` 后回读重试；③ 冲突为 `uk_todo_item_req` 时直接按 `requestId` 回读首次结果，不再重试取号。
 
-### P0-3 `G16.1` — 无指标埋点
+### P1-2 `S8.1`/`G10` — 请求头按大小写精确查找，小写头将导致全量 401
 
-`src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:143-147`
-
-片段范围：`src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:143-147`
+**P1** `S8.1` `src/main/java/com/antdigital/todo/integration/impl/GatewayAuthIntegrationImpl.java:69` — HTTP 头名大小写不敏感，但 `@RequestHeader Map<String,String>` 保留容器原始大小写（非 `HttpHeaders` 的大小写不敏感实现），代码以 `"X-User-Id"` 等精确 key 取值。若网关下发 `x-user-id`（HTTP/2 强制小写、部分网关默认小写），`userId`/`tenantId` 恒空 → 所有创建请求 **TODO_0005**，功能整体不可用；单测用精确大小写 `HashMap` 无法暴露该问题。
+片段范围：`src/main/java/com/antdigital/todo/integration/impl/GatewayAuthIntegrationImpl.java:65-78`
 
 ```java
-L143|            auditCreateQuietly(validated.getRequestId(), entity.getTodoNo(), operator.getUserId());
-L144|            LOGGER.info("todo create success, requestId={}, todoNo={}, creatorId={}, cost={}ms",
-L145|                    validated.getRequestId(), entity.getTodoNo(), operator.getUserId(),
-L146|                    System.currentTimeMillis() - startMillis);
-        // 问题：success/cost/idempotent/rate_limited/no_degrade 仅有日志文本，无 todo_create_total 等指标，
-        //       系分 §6.5 的「成功率 <99%」「P99 >500ms」「TODO_0008 >20 次/分」告警无数据源
-L147|            return toResult(entity, false);
+L65|public OperatorContext resolveOperator(Map<String, String> headers) {
+L66|    if (headers == null || headers.isEmpty()) {
+L67|        throw new TodoBizException(TodoErrorCodeEnum.NOT_LOGIN);
+L68|    }
+L69|    String userId = TodoTextUtil.trimWhitespace(headers.get(TodoConstants.HEADER_USER_ID));
+L70|    String tenantId = TodoTextUtil.trimWhitespace(headers.get(TodoConstants.HEADER_TENANT_ID));
+L71|    if (userId.isEmpty() || tenantId.isEmpty()) {
+L72|        LOGGER.error("gateway identity header missing, userIdPresent={}, tenantIdPresent={}",
+L73|                !userId.isEmpty(), !tenantId.isEmpty());
+L74|        throw new TodoBizException(TodoErrorCodeEnum.NOT_LOGIN);
+L75|    }
+L76|    String rawUserName = TodoTextUtil.trimWhitespace(headers.get(TodoConstants.HEADER_USER_NAME));
+L77|    List<String> permissions = parsePermissions(headers.get(TodoConstants.HEADER_USER_PERMISSIONS));
+L78|    signatureVerifier.verify(headers, buildCanonicalPayload(userId, rawUserName, tenantId, permissions));
 ```
 
-**Spec 证据**：design §6.5 埋点清单（`todo_create_total`/`todo_create_cost_ms`/`todo_create_idempotent_hit_total`/`todo_create_rate_limited_total`/`todo_no_degrade_total`）及 5 条告警规则；§7.1 依赖与业务埋点。
+> **修复方向**：Controller 改用 `HttpHeaders`（大小写不敏感）或以 `LinkedCaseInsensitiveMap` 归一后再解析；补一条「全小写请求头」用例。
 
-### P1-1 `S8.1`/`G14.2` — tenantId 缺失静默回落
+### P1-3 `G16.1`/`G13.1` — 取号降级指标恒计数，§6.5 告警永久触发
 
-`src/main/java/com/antdigital/todo/integration/impl/GatewayAuthIntegrationImpl.java:70-73`
-
-片段范围：`src/main/java/com/antdigital/todo/integration/impl/GatewayAuthIntegrationImpl.java:70-73`
+**P1** `G16.1` `src/main/java/com/antdigital/todo/service/component/SnowflakeSequenceProvider.java:125` — 唯一注册的 `TodoSequenceProvider` 实现恒返回 `isDegraded()==true`，`TodoNoGeneratorImpl` 每次取号都 `recordNoDegrade()`，`todo_no_degrade_total` 恒等于创建量；README/系分 §6.5 的「编号降级事件 > 10 次/分钟 → P2 告警」在全量流量下持续触发，真实降级（Redis 故障）反而无法辨识。
+片段范围：`src/main/java/com/antdigital/todo/service/component/TodoNoGeneratorImpl.java:77-85`
 
 ```java
-L70|        String tenantId = TodoTextUtil.trimWhitespace(headers.get(TodoConstants.HEADER_TENANT_ID));
-L71|        if (tenantId.isEmpty()) {
-L72|            tenantId = TodoConstants.DEFAULT_TENANT_ID;   // 问题：R05 要求上下文缺失 → TODO_0005，此处静默写入租户 "0"
-L73|        }
+L77|public String nextTodoNo() {
+L78|    String dateKey = DATE_FORMATTER.format(dateSupplier.get());
+L79|    long sequence = sequenceProvider.nextSequence(dateKey);
+L80|    if (sequenceProvider.isDegraded()) {
+L81|        todoMetrics.recordNoDegrade();
+L82|    }
+L83|    long suffix = Math.abs(sequence % TodoConstants.TODO_NO_SEQ_MODULUS);
+L84|    return TodoConstants.TODO_NO_PREFIX + dateKey + padLeft(String.valueOf(suffix));
+L85|}
 ```
 
-**Spec 证据**：design R05「`creatorId`/`creatorName`/`tenantId` 只取网关注入的登录上下文…若上下文缺失 → TODO_0005」、§6.4.2.1「`tenant_id` 由网关签名透传，业务层不得跨租户写入」。
-
-### P1-2 `G3.2` — 审计投递在事务内
-
-`src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:102-103,143`
-
-片段范围：`src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:102-103,143`
+片段范围：`src/main/java/com/antdigital/todo/service/component/SnowflakeSequenceProvider.java:119-127`
 
 ```java
-L102|    @Override
-L103|    @Transactional(rollbackFor = Exception.class)
-L104|    public TodoCreateResult createTodo(TodoCreateRequest request, OperatorContext operator) {
-...
-L143|            auditCreateQuietly(validated.getRequestId(), entity.getTodoNo(), operator.getUserId());
-        // 问题：审计在事务提交前发出；若此后事务回滚（如外层调用方抛异常），审计仍记录「创建成功」
+L119|/**
+L120| * 本实现为取号降级路径，需上报 {@code todo_no_degrade_total}。
+L121| *
+L122| * @return 恒为 true
+L123| */
+L124|@Override
+L125|public boolean isDegraded() {
+L126|    return true;
+L127|}
 ```
 
-**Spec 证据**：design §5.1.3.1「审计与限流均在**事务外**/异步执行，避免长事务」；R10「创建成功必须写审计日志」。
+> **Spec 证据**：design §6.5「`todo_no_degrade_total`（编号降级次数）」「编号降级事件 > 10 次/分钟 → P2 告警（提示 Redis 异常）」。
+> **修复方向**：区分「当前生效实现」与「运行时降级」——默认雪花实现不计降级；或改为 `todo_no_source_total{provider=...}`，仅实际切走 Redis 时计入降级。
 
-### P1-3 `G2.2`/`G9.3` — 幂等键冲突依赖 DB 错误文案解析
+### P1-4 `S8.1` — 网关签名未绑定 method/path/报文，窗口内可重放
 
-`src/main/java/com/antdigital/todo/dao/manager/TodoItemManager.java:76-89`
-
-片段范围：`src/main/java/com/antdigital/todo/dao/manager/TodoItemManager.java:76-89`
+**P1** `S8.1` `src/main/java/com/antdigital/todo/integration/support/GatewaySignatureVerifier.java:131` — 签名明文仅含 `timestamp + userId + userName + tenantId + permissions`，不含 HTTP 方法、路径与请求体摘要，且仅靠 300s 时间戳窗口防重放、无 nonce 去重。头部一旦泄露（日志、代理、TLS 终结侧），攻击者可在窗口内以该用户身份提交任意待办内容。
+片段范围：`src/main/java/com/antdigital/todo/integration/support/GatewaySignatureVerifier.java:125-136`
 
 ```java
-L76|    private String resolveConstraintName(DuplicateKeyException e) {
-L77|        Throwable cause = e.getMostSpecificCause();
-L78|        String message = cause == null ? null : cause.getMessage();
-L79|        if (message == null) {
-L80|            return "";                     // 问题：解析失败返回空串
-L81|        }
-L82|        if (message.contains(TodoDuplicateKeyException.UK_REQUEST_ID)) {
-L83|            return TodoDuplicateKeyException.UK_REQUEST_ID;
-L84|        }
-        ...
-L88|        return "";
-L89|    }
+L125|long timestamp = parseTimestamp(timestampText);
+L126|long now = clock.getAsLong();
+L127|if (Math.abs(now - timestamp) > toleranceMillis) {
+L128|    LOGGER.warn("gateway signature timestamp out of tolerance, deviation={}ms", now - timestamp);
+L129|    throw new TodoBizException(TodoErrorCodeEnum.NOT_LOGIN);
+L130|}
+L131|String expected = sign(secret, timestampText + PAYLOAD_SEPARATOR + canonicalPayload);
+L132|if (!MessageDigest.isEqual(expected.getBytes(StandardCharsets.UTF_8),
+L133|        signature.toLowerCase().getBytes(StandardCharsets.UTF_8))) {
+L134|    LOGGER.warn("gateway signature mismatch, reject request");
+L135|    throw new TodoBizException(TodoErrorCodeEnum.NOT_LOGIN);
+L136|}
 ```
 
-配套：`src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:124-137` —— `constraintName=""` 时 `isRequestIdConflict` 为 false，走「编号冲突」分支 `continue` 重试；第二次插入同一 `requestId` 再次冲突，循环耗尽后抛 `TODO_0007`，而**系分要求返回首次结果（`idempotent=true`）**。**Spec 证据**：design §5.1.3.1 异常场景表「唯一键冲突（并发重复提交）→ 捕获后按 `request_id` 重查并返回首次结果，`idempotent=true`，不向用户报错」。
+> **修复方向**：载荷加入 `method + path + sha256(body)`（与网关同口径）；缩短容差（如 60s）或引入 `X-Gateway-Nonce` + 短 TTL 去重缓存。
 
-### P1-4 `G1.1`/`G2` — 雪花取号多实例同 ID + 6 位取模碰撞
+### P1-5 `G8.2` — 系分要求的创建接口线程池/信号量隔离未实现
 
-`src/main/java/com/antdigital/todo/service/component/SnowflakeSequenceProvider.java:56-58` 与 `TodoNoGeneratorImpl.java:69-71`
-
-片段范围：`src/main/java/com/antdigital/todo/service/component/SnowflakeSequenceProvider.java:56-58`
+**P1** `G8.2` `src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:126` — 系分 §6.3 明确「创建接口独立线程池/信号量（默认 50 并发），防止慢 SQL 拖垮整个应用」，代码与 `application.yml` 均无相应配置，创建链路直接运行在容器工作线程上；DB 变慢时全部 Tomcat 线程被占满，影响同实例其他请求。
+片段范围：`src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:124-131`
 
 ```java
-L56|    public SnowflakeSequenceProvider() {
-L57|        this(0L, 0L);      // 问题：所有实例默认 workerId=0、datacenterId=0，多副本同毫秒会生成完全相同的序列
-L58|    }
+L124|@Override
+L125|@Transactional(rollbackFor = Exception.class)
+L126|public TodoCreateResult createTodo(TodoCreateRequest request, OperatorContext operator) {
+L127|    long startMillis = System.currentTimeMillis();
+L128|    try {
+L129|        TodoCreateResult result = doCreate(request, operator);
+L130|        todoMetrics.recordCreateSuccess(System.currentTimeMillis() - startMillis);
+L131|        return result;
 ```
 
-片段范围：`src/main/java/com/antdigital/todo/service/component/TodoNoGeneratorImpl.java:69-71`
+> **Spec 证据**：design §6.3「隔离：创建接口独立线程池/信号量（默认 50 并发），防止慢 SQL 拖垮整个应用」。
+> **修复方向**：为创建链路加信号量/Bulkhead（默认 50 并发），超限快速失败并埋点；同步 `application.yml` 与模块文档配置表。
+
+### P1-6 `R08`/REQ-6 — `source` 接受客户端指定，与 R08 冲突
+
+**P1** `R08` `src/main/java/com/antdigital/todo/service/component/TodoValidator.java:100` — R08 要求 `status`/`is_deleted`/`source` 均「不接受前端指定，服务端覆盖为固定值」，实现却按 W01 入参表接受 `source` 并落库（白名单 web/app/api）。spec 自身矛盾（W01 入参表含 `source`，R08 禁止），代码取了宽口径，需澄清并统一文档与实现。
+片段范围：`src/main/java/com/antdigital/todo/service/component/TodoValidator.java:94-106`
 
 ```java
-L69|        long sequence = sequenceProvider.nextSequence(dateKey);
-L70|        long suffix = Math.abs(sequence % TodoConstants.TODO_NO_SEQ_MODULUS);   // 问题：再压缩到 10^6，多实例碰撞概率被放大
-L71|        return TodoConstants.TODO_NO_PREFIX + dateKey + padLeft(String.valueOf(suffix));
+L94|/**
+L95| * 解析创建来源，缺省为 web，取值非法时报参数错误。
+L96| *
+L97| * @param source 原始来源
+L98| * @return 规范化后的来源编码
+L99| */
+L100|private String resolveSource(String source) {
+L101|    String trimmed = TodoTextUtil.trimWhitespace(source);
+L102|    if (trimmed.isEmpty()) {
+L103|        return TodoConstants.DEFAULT_SOURCE;
+L104|    }
+L105|    return TodoSourceEnum.of(trimmed).getCode();
+L106|}
 ```
 
-**Spec 证据**：design §5.1 支撑层「ID 生成…保证多实例下不重复」；S04「依赖 Redis INCR…不可用时降级为雪花后缀；不保证唯一，唯一性由 `uk_todo_item_no` 兜底」+ R09 仅重试 1 次 → 高并发下用户可见 `TODO_0007`。
+> **修复方向**：二选一并统一文档/实现——① 保留 W01 口径，修订 R08 为「`status`/`is_deleted` 不接受前端指定；`source` 允许白名单值，缺省 web」；② 严格按 R08，服务端固定 `web` 并删除入参字段。
 
-### P1-5 `G8.1`/`G16.2` — 审计降级无告警
+### P2-1 `G16.1` — 成功指标/成功日志先于事务提交
 
-`src/main/java/com/antdigital/todo/integration/impl/AuditIntegrationImpl.java:74-80`
+**P2** `G16.1` `src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:130` — 成功计数与「todo create success」日志在 `@Transactional` 方法返回前执行；若提交阶段失败（连接中断、提交时暴露的死锁回滚），指标与日志仍记成功，成功率虚高。
 
-片段范围：`src/main/java/com/antdigital/todo/integration/impl/AuditIntegrationImpl.java:74-80`
+片段范围：`src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:127-134`
 
 ```java
-L74|    public void recordCreate(String requestId, String todoNo, String operatorId, boolean success) {
-L75|        String event = buildEvent(requestId, todoNo, operatorId, success);
-L76|        boolean offered = eventQueue.offer(event);
-L77|        if (!offered) {
-L78|            LOGGER.error("audit queue full, degrade to local log. event={}", event);
-        // 问题：仅本地日志，无告警计数/指标，R10 要求的「监控告警」未落地
-L79|        }
+L127|long startMillis = System.currentTimeMillis();
+L128|try {
+L129|    TodoCreateResult result = doCreate(request, operator);
+L130|    todoMetrics.recordCreateSuccess(System.currentTimeMillis() - startMillis);
+L131|    return result;
+L132|} catch (TodoBizException e) {
+L133|    todoMetrics.recordCreateFailure(e.getCode(), System.currentTimeMillis() - startMillis);
+L134|    throw e;
+```
+
+> **修复方向**：与审计一致，成功计数/成功日志放到 `afterCommit` 回调。
+
+### P2-2 `G16.1` — 非存储异常统一记 `TODO_0008`，与响应码 TODO_0011 不一致
+
+**P2** `G16.1` `src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:136` — 任何 `RuntimeException`（含并发死锁、NPE）均计入 `code=TODO_0008`，而全局处理器对非业务异常返回 **TODO_0011**，导致 §6.5「TODO_0008 1 分钟 > 20 次」告警口径失真。
+
+片段范围：`src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:135-139`
+
+```java
+L135|} catch (RuntimeException e) {
+L136|    todoMetrics.recordCreateFailure(TodoErrorCodeEnum.STORAGE_ERROR.getCode(),
+L137|            System.currentTimeMillis() - startMillis);
+L138|    throw e;
+L139|}
+```
+
+### P2-3 `G16.1` — 指标每次请求动态 `register`
+
+**P2** `G16.1` `src/main/java/com/antdigital/todo/service/component/TodoMetrics.java:190` — 每次创建都 `Counter.builder(...).register(...)`，热路径重复注册表查找；建议按 code 预注册或缓存 `Counter`。
+
+片段范围：`src/main/java/com/antdigital/todo/service/component/TodoMetrics.java:189-198`
+
+```java
+L189|private void recordCreate(String code, long costMillis) {
+L190|    Counter.builder(METRIC_CREATE_TOTAL)
+L191|            .description("待办创建调用总数")
+L192|            .tag(TAG_CODE, code)
+L193|            .register(meterRegistry)
+L194|            .increment();
+L195|    if (costMillis >= 0) {
+L196|        createCostSummary.record(costMillis);
+L197|    }
+L198|}
+```
+
+### P2-4 `G4.2` — 唯一索引不含 `is_deleted`，幂等查询却过滤软删
+
+**P2** `G4.2` `src/main/resources/mapper/TodoItemMapper.xml:49` + `src/main/resources/db/todo_item.sql:22` — `uk_todo_item_req(tenant_id, request_id)` 不区分删除位，而幂等查询附加 `is_deleted = 0`。日后启用逻辑删除时，同 `requestId` 重新提交会命中唯一键冲突 → 加锁回查因 `is_deleted=0` 查不到 → 重试耗尽返回误导性的 **TODO_0007**（应提示「已存在/已删除」）。
+
+片段范围：`src/main/resources/mapper/TodoItemMapper.xml:43-52`
+
+```xml
+L43|<select id="selectByRequestIdForUpdate" resultMap="TodoItemResultMap">
+L44|    SELECT
+L45|    <include refid="BaseColumns"/>
+L46|    FROM todo_item
+L47|    WHERE tenant_id = #{tenantId}
+L48|    AND request_id = #{requestId}
+L49|    AND is_deleted = 0
+L50|    LIMIT 1
+L51|    FOR UPDATE
+L52|</select>
+```
+
+> **修复方向**：回查不过滤 `is_deleted`（命中软删记录给出明确错误码），或将删除位纳入唯一索引并同步系分 §5.1.1.1。
+
+### P2-5 `G13`（性能） — 限流器在高基数下每次请求全量扫描
+
+**P2** `G13.1` `src/main/java/com/antdigital/todo/service/component/TodoRateLimiter.java:91` — 用户条目数 ≥ 1024 后，**每次** `acquire` 都遍历全部用户队列（O(n) 且逐个 `synchronized`），用户量大或被刷时会把限流器自身变成瓶颈。
+
+片段范围：`src/main/java/com/antdigital/todo/service/component/TodoRateLimiter.java:86-104`
+
+```java
+L86|/**
+L87| * 回收已完全滑出窗口的用户条目：仅在用户数超过阈值时触发，避免每次请求全量遍历。
+L88| *
+L89| * @param now 当前毫秒
+L90| */
+L91|private void evictIdleUsers(long now) {
+L92|    if (timestamps.size() < TodoConstants.RATE_LIMIT_IDLE_SCAN_THRESHOLD) {
+L93|        return;
+L94|    }
+L95|    for (Map.Entry<String, Deque<Long>> entry : timestamps.entrySet()) {
+L96|        Deque<Long> queue = entry.getValue();
+L97|        synchronized (queue) {
+L98|            evictExpired(queue, now);
+L99|            if (queue.isEmpty()) {
+L100|                timestamps.remove(entry.getKey(), queue);
+L101|            }
+L102|        }
+L103|    }
+L104|}
+```
+
+> **修复方向**：改为定时清理任务或分片轮询（每次只扫 1/N），避免请求路径上的全量遍历。
+
+### P2-6 `A4.4` — 死常量 `DEFAULT_RATE_LIMIT_PER_MINUTE`
+
+**P2** `A4.4` `src/main/java/com/antdigital/todo/common/constant/TodoConstants.java:68` — 该常量全仓库无引用（`@Value("${todo.create.rate-limit-per-minute:30}")` 直接写字面量 30），属上轮 P2-8「死常量」整改遗漏。
+
+片段范围：`src/main/java/com/antdigital/todo/common/constant/TodoConstants.java:65-68`
+
+```java
+L65|/**
+L66| * 单用户默认每分钟创建次数上限（R11）
+L67| */
+L68|public static final int DEFAULT_RATE_LIMIT_PER_MINUTE = 30;
+```
+
+### P2-7 `G13.1` — 总开关关闭与灰度未命中共用错误码与指标
+
+**P2** `G13.1` `src/main/java/com/antdigital/todo/service/component/TodoCreateGate.java:68` — 两种语义（应急关停 / 灰度未放量）都抛 `FEATURE_DISABLED` 且累加同一 `todo_create_gray_blocked_total`，灰度期与应急演练时无法从指标区分拦截原因。
+
+片段范围：`src/main/java/com/antdigital/todo/service/component/TodoCreateGate.java:68-81`
+
+```java
+L68|public void check(String tenantId) {
+L69|    if (!createEnabled) {
+L70|        LOGGER.warn("todo create feature disabled by switch");
+L71|        throw new TodoBizException(TodoErrorCodeEnum.FEATURE_DISABLED);
+L72|    }
+L73|    if (grayTails.isEmpty()) {
+L74|        return;
+L75|    }
+L76|    String tail = resolveTenantTail(tenantId);
+L77|    if (!grayTails.contains(tail)) {
+L78|        LOGGER.info("tenant not in gray scope, tenantTail={}", tail);
+L79|        throw new TodoBizException(TodoErrorCodeEnum.FEATURE_DISABLED);
 L80|    }
+L81|}
 ```
 
-**Spec 证据**：design R10「审计失败不阻断创建…降级为 ERROR 级本地日志 **+ 监控告警**」；§6.5「审计投递失败 > 50 次/分钟 → P3 告警」。
+> **修复方向**：指标加 `reason=switch|gray` 标签（或拆两个计数器），日志同步带上原因。
 
-### P1-6 功能偏差 — 限流单实例口径
+### P2-8 `S9`/配置 — 签名校验可被配置关闭且无生产防护
 
-`src/main/java/com/antdigital/todo/service/component/TodoRateLimiter.java:40-47`
+**P2** `S9` `src/main/java/com/antdigital/todo/integration/support/GatewaySignatureVerifier.java:110` + `src/main/resources/application.yml:29` — `auth.gateway.verify.enabled=false` 时直接 `return`，身份头退化为「客户端可信」，仅靠文档约定「生产禁止关闭」；误配置将静默放开越权写入。
 
-片段范围：`src/main/java/com/antdigital/todo/service/component/TodoRateLimiter.java:40-47`
+片段范围：`src/main/java/com/antdigital/todo/integration/support/GatewaySignatureVerifier.java:109-117`
 
 ```java
-L40|    private final Map<String, Deque<Long>> timestamps = new ConcurrentHashMap<>();
-L41|
-L42|    /**
-L43|     * 默认构造：30 次/分钟，系统时钟。
-L44|     */
-L45|    public TodoRateLimiter() {
-L46|        this(TodoConstants.DEFAULT_RATE_LIMIT_PER_MINUTE, System::currentTimeMillis);
-        // 问题：进程内计数器，N 副本部署时单用户实际额度 ≈ 30×N，且未读配置项
-L47|    }
+L109|public void verify(Map<String, String> headers, String canonicalPayload) {
+L110|    if (!verifyEnabled) {
+L111|        return;
+L112|    }
+L113|    String secret = TodoTextUtil.trimWhitespace(signSecret);
+L114|    if (secret.isEmpty()) {
+L115|        LOGGER.error("gateway sign secret is not configured, reject request to avoid trusting client headers");
+L116|        throw new TodoBizException(TodoErrorCodeEnum.NOT_LOGIN);
+L117|    }
 ```
 
-**Spec 证据**：design R11「单用户创建频率限制：默认 30 次/分钟（可配置）」；§6.3「限流：单用户 30 次/分钟（令牌桶，本地 + 网关双层）」。
+> **修复方向**：`prod` profile 下 `verifyEnabled=false` 直接启动失败，或将该开关移出配置中心可写范围。
 
-### P2-1 `M016`/`G14.3` — 默认时区
+### P2-9 `G10.1` — 重复请求头只保留一个值
 
-`src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:220`
+**P2** `G10.1` `src/main/java/com/antdigital/todo/controller/TodoController.java:70` — `@RequestHeader Map<String,String>` 在头名重复时只能保留一个值，若网关以多值形式下发权限头，可能丢掉 `TODO_CREATE` 导致误判 TODO_0006。
 
-片段范围：`src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:219-220`
+片段范围：`src/main/java/com/antdigital/todo/controller/TodoController.java:68-74`
 
 ```java
-L219|    private TodoItemDO buildEntity(ValidatedTodo validated, OperatorContext operator) {
-L220|        LocalDateTime now = LocalDateTime.now();   // 问题：依赖 JVM 默认时区，部署时区变更会导致 gmt_create 漂移
+L68|@PostMapping("/create")
+L69|public ApiResult<TodoCreateVO> create(@Valid @RequestBody TodoCreateRequest request,
+L70|                                      @RequestHeader Map<String, String> headers) {
+L71|    OperatorContext operator = authIntegration.resolveOperator(headers);
+L72|    TodoCreateResult result = todoService.createTodo(request, operator);
+L73|    return ApiResult.success(toVO(result));
+L74|}
 ```
 
-配套 `src/main/java/com/antdigital/todo/service/component/TodoNoGeneratorImpl.java:47`（`LocalDate::now`，影响 `todo_no` 日期段跨零点归属）。**Spec 证据**：design §3 时间字段统一 datetime；pre 扫 `M016` 命中。
+> **修复方向**：改用 `HttpHeaders` 或显式声明头参数，并在文档明确「权限头单值、逗号分隔」契约。
 
-### P2-2 `G10.1` — 未知异常映射混淆
+### P2-10 `G8.4` — 审计停机中断后未再 join 即统计残留
 
-`src/main/java/com/antdigital/todo/controller/TodoExceptionHandler.java:123-127`
+**P2** `G8.4` `src/main/java/com/antdigital/todo/integration/impl/AuditIntegrationImpl.java:110` — `interrupt()` 后立即读 `eventQueue.size()` 计数，消费线程可能仍在收尾，残留数与实际丢弃数存在偏差，弱化停机丢审计的可观测性。
 
-片段范围：`src/main/java/com/antdigital/todo/controller/TodoExceptionHandler.java:123-127`
+片段范围：`src/main/java/com/antdigital/todo/integration/impl/AuditIntegrationImpl.java:101-118`
 
 ```java
-L123|    @ExceptionHandler(Exception.class)
-L124|    public ResponseEntity<ApiResult<Void>> handleUnexpected(Exception e) {
-L125|        LOGGER.error("todo unexpected error", e);
-L126|        return buildError(TodoErrorCodeEnum.STORAGE_ERROR);   // 问题：非存储类异常（NPE/序列化等）也返回 TODO_0008，排障与重试语义混淆
-L127|    }
+L101|@PreDestroy
+L102|public void shutdown() {
+L103|    running.set(false);
+L104|    try {
+L105|        consumer.join(TimeUnit.SECONDS.toMillis(SHUTDOWN_WAIT_SECONDS));
+L106|    } catch (InterruptedException e) {
+L107|        Thread.currentThread().interrupt();
+L108|        LOGGER.error("interrupted while waiting audit consumer shutdown", e);
+L109|    }
+L110|    if (consumer.isAlive()) {
+L111|        consumer.interrupt();
+L112|    }
+L113|    int remaining = eventQueue.size();
+L114|    if (remaining > 0) {
+L115|        todoMetrics.recordAuditDegrade();
+L116|        LOGGER.error("audit queue not drained on shutdown, dropped={}", remaining);
+L117|    }
+L118|}
 ```
 
-### P2-3 — 配置项未接线
+### P2-11 `A2.4` — import 分组顺序（`java.*` 置于 `org.*` 之后）
 
-`src/main/resources/application.yml:29-32` / `src/main/java/com/antdigital/todo/service/component/TodoRateLimiter.java:45-47`
+**P2** `A2.4` `src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:23` — 非静态 import 未按完整名 ASCII 升序，`java.*` 排在 `org.*` 之后（全仓库一致），影响统一格式化与工具校验。
 
-```yaml
-L29| todo:
-L30|   create:
-L31|     # 单用户每分钟创建次数上限（R11）
-L32|     rate-limit-per-minute: 30
-```
-
-片段范围：`src/main/java/com/antdigital/todo/service/component/TodoRateLimiter.java:45-47`
+片段范围：`src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:23-30`
 
 ```java
-L45|    public TodoRateLimiter() {
-L46|        this(TodoConstants.DEFAULT_RATE_LIMIT_PER_MINUTE, System::currentTimeMillis);
-L47|    }   // 问题：未使用 @Value("${todo.create.rate-limit-per-minute:30}")，改配置不生效
-```
-
-### P2-4 — `data.id` 类型与系分不一致
-
-`src/main/java/com/antdigital/todo/model/vo/TodoCreateVO.java:16` / `TodoController.java:85`
-
-片段范围：`src/main/java/com/antdigital/todo/controller/TodoController.java:84-85`
-
-```java
-L84|        // 主键以 String 返回，避免前端 Number 精度丢失
-L85|        vo.setId(result.getId() == null ? null : String.valueOf(result.getId()));
-        // 问题：W01 出参表定义 data.id 为 Long，实现为 String，契约与文档不一致（需二选一修订）
-```
-
-### P2-5 `G6.1` — 限流器 Map 无淘汰
-
-`src/main/java/com/antdigital/todo/service/component/TodoRateLimiter.java:40,66-68`
-
-片段范围：`src/main/java/com/antdigital/todo/service/component/TodoRateLimiter.java:66-68`
-
-```java
-L66|    public void acquire(String userId) {
-L67|        long now = clock.getAsLong();
-L68|        Deque<Long> queue = timestamps.computeIfAbsent(userId, key -> new ArrayDeque<>());
-        // 问题：仅裁剪单个队列内部时间戳，userId 条目永不移除；用户量大时 Map 无界增长
-```
-
-### P2-6 — 审计关闭丢弃剩余事件
-
-`src/main/java/com/antdigital/todo/integration/impl/AuditIntegrationImpl.java:86-95`
-
-片段范围：`src/main/java/com/antdigital/todo/integration/impl/AuditIntegrationImpl.java:85-95`
-
-```java
-L85|    @PreDestroy
-L86|    public void shutdown() {
-L87|        running.set(false);
-L88|        consumer.interrupt();     // 问题：interrupt 后 consume 立即 return，队列中剩余事件被静默丢弃且无日志/计数
-L89|        try {
-L90|            consumer.join(TimeUnit.SECONDS.toMillis(SHUTDOWN_WAIT_SECONDS));
-```
-
-### P2-7 `A3.4` — 行宽超限
-
-`src/main/java/com/antdigital/todo/integration/impl/GatewayAuthIntegrationImpl.java:74`
-
-片段范围：`src/main/java/com/antdigital/todo/integration/impl/GatewayAuthIntegrationImpl.java:74`
-
-```java
-L74|        return new OperatorContext(userId, userName, tenantId, parseRoles(headers.get(TodoConstants.HEADER_USER_ROLES)));
-        // 121 字符 > 120，建议按参数换行
-```
-
-配套：`src/test/java/com/antdigital/todo/service/component/TodoValidatorTest.java:67`（121）、`:133`（134）。
-
-### P2-8 — 死常量
-
-`src/main/java/com/antdigital/todo/common/constant/TodoConstants.java:153-166`
-
-片段范围：`src/main/java/com/antdigital/todo/common/constant/TodoConstants.java:153-166`
-
-```java
-L153|    /**
-L154|     * 雪花算法工作节点 ID 位数
-L155|     */
-L156|    public static final int SNOWFLAKE_WORKER_ID_BITS = 5;      // 问题：全仓库无引用
-...
-L164|    /**
-L165|     * 待办编号降级后缀长度（取雪花 ID 后 6 位，与序号位数对齐）
-L166|     */
-L166|    public static final int TODO_NO_FALLBACK_SUFFIX_LENGTH = 6;   // 问题：全仓库无引用（降级路径未实现）
-```
-
-### P2-9 `G11.2` — 测试缺口
-
-`src/test/java/com/antdigital/todo/service/impl/TodoServiceImplTest.java:136-154`
-
-片段范围：`src/test/java/com/antdigital/todo/service/impl/TodoServiceImplTest.java:136-154`
-
-```java
-L136|    @Test
-L137|    @DisplayName("并发重复提交：唯一键冲突后重查并返回首次结果")
-L138|    void should_returnFirstResult_when_duplicateRequestIdRace() {
-        // 问题：仅覆盖「索引名可识别」的理想路径；未覆盖 constraintName=""/无法识别时
-        //       应仍返回首次结果而非 TODO_0007（对应 P1-3 的缺口），也无跨租户隔离用例
-L144|        todoItemMapper.missSelectOnce = true;
-```
-
-配套：`src/test/java/com/antdigital/todo/controller/TodoControllerTest.java` 仅 3 个用例，未覆盖 `/create` 缺 `requestId` 时 `@Valid` → `resolveFieldCode` 的错误码映射。
-
-### P2-10 — 雪花忙等自旋
-
-`src/main/java/com/antdigital/todo/service/component/SnowflakeSequenceProvider.java:111-118`
-
-片段范围：`src/main/java/com/antdigital/todo/service/component/SnowflakeSequenceProvider.java:111-118`
-
-```java
-L111|    private long waitUntil(long targetTimestamp) {
-L112|        long timestamp = System.currentTimeMillis();
-L113|        while (timestamp < targetTimestamp) {
-L114|            Thread.yield();          // 问题：时钟回拨期间纯自旋忙等，占用 CPU；建议短 sleep 或回拨阈值快速失败
-L115|            timestamp = System.currentTimeMillis();
-L116|        }
+L23|import org.slf4j.Logger;
+L24|import org.slf4j.LoggerFactory;
+L25|import org.springframework.transaction.support.TransactionSynchronization;
+L26|import org.springframework.transaction.support.TransactionSynchronizationManager;
+L27|
+L28|import java.time.LocalDateTime;
 ```
 
 ---
 
 ## 8. 修复任务列表
 
-> 供后续改代码逐项执行与核销。
->
-> **修复状态（2026-10-29）**：P0×3、P1×6、P2×10 已全部修复并通过 `mvn test`（111/111），逐项结论与验证证据见 `2026-10-29-todo-create-cr-fix-report.md`。
+> 供后续改代码逐项执行与核销；与 §3–§7 的 `⚠️`/P1/P2 一一对应，完成改 `- [x]`。
 
 ### P0
 
-- [x] **P0** `GatewayAuthIntegrationImpl.java:50-75` + `TodoServiceImpl.java:201-210` — 接入网关签名/票据真实校验（`auth.verify.enabled` 默认 true），身份取自校验结果；权限判定改为对接权限平台权限点（R06），不再信任客户端可控的 `X-User-Id`/`X-User-Roles`。
-- [x] **P0** `TodoServiceImpl.java:104-110` — 新增 `todo.create.enabled` 总开关与 `todo.create.gray.tenants` 灰度判定，未命中返回「功能未开放」，并在 `application.yml` 补齐配置项。
-- [x] **P0** `TodoServiceImpl.java:143-147` — 补齐 `todo_create_total`/`todo_create_cost_ms`/`todo_create_idempotent_hit_total`/`todo_create_rate_limited_total`/`todo_no_degrade_total` 指标埋点与告警接入。
+- 无待修复项。
 
 ### P1
 
-- [x] **P1** `GatewayAuthIntegrationImpl.java:70-73` — 删除 `tenantId` 静默回落 `"0"`，缺失时按 R05 抛 `TODO_0005`。
-- [x] **P1** `TodoServiceImpl.java:143` — 将审计投递移出 `@Transactional`（事务提交后事件回调或 `TransactionSynchronization`），避免回滚仍记成功审计。
-- [x] **P1** `TodoItemManager.java:76-89` — 消除对 DB 错误文案的依赖：改为插入前按 `request_id` 二次确认，或冲突后无条件重查 `request_id`，解析失败时仍返回首次结果。
-- [x] **P1** `SnowflakeSequenceProvider.java:56-58` — 去掉 `(0L, 0L)` 默认构造，改由配置/环境注入唯一 `workerId`/`datacenterId`；`TodoNoGeneratorImpl.java:70` 的 6 位取模改为更高基数（如 8 位）或直接用号段保证不碰撞。
-- [x] **P1** `AuditIntegrationImpl.java:74-80` — 队列满/投递失败接入告警计数（对接 P0 的指标体系），满足 R10「ERROR 日志 + 监控告警」。
-- [x] **P1** `TodoRateLimiter.java:40-47` — 明确双层限流落点：要么接入集中式限流（Redis/网关）保证 30 次/分钟全局限额，要么在 `docs/modules/todo/README.md` 显著标注「本服务仅单实例限流，集群限额由网关保证」并给出网关配置项。
+- [ ] **P1** `src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:170` — `G1.1` 消除幂等回查的锁升级死锁：冲突为 `uk_todo_item_req` 时改用独立事务/非加锁回读（或捕获死锁异常后回读重试），保证 R07「重复提交返回首次结果」
+- [ ] **P1** `src/main/java/com/antdigital/todo/integration/impl/GatewayAuthIntegrationImpl.java:69` — `S8.1`/`G10` 请求头解析改为大小写不敏感（`HttpHeaders`/`LinkedCaseInsensitiveMap`），并补「全小写请求头」单测
+- [ ] **P1** `src/main/java/com/antdigital/todo/service/component/SnowflakeSequenceProvider.java:125` — `G16.1` 修正取号降级指标口径（默认雪花实现不计降级，或改 `provider` 维度计数），恢复 §6.5 告警有效性
+- [ ] **P1** `src/main/java/com/antdigital/todo/integration/support/GatewaySignatureVerifier.java:131` — `S8.1` 签名载荷绑定 method+path+body 摘要，并缩短时间戳容差或引入 nonce 防重放
+- [ ] **P1** `src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:126` — `G8.2` 为创建链路补信号量/线程池隔离（默认 50 并发、超限快速失败），同步 `application.yml` 与模块文档
+- [ ] **P1** `src/main/java/com/antdigital/todo/service/component/TodoValidator.java:100` — `R08` 澄清并统一 `source` 口径（修订 R08 或服务端固定 `web`），使 spec 与实现一致
 
 ### P2（可选）
 
-- [x] **P2** `TodoServiceImpl.java:220`、`TodoNoGeneratorImpl.java:47` — 显式指定时区（如 `ZoneId.of("Asia/Shanghai")` 或统一 UTC），消除 `M016`。
-- [x] **P2** `TodoExceptionHandler.java:123-127` — 兜底异常改用独立错误码或 `UNKNOWN_ERROR` 语义，避免与 `TODO_0008` 存储异常混淆。
-- [x] **P2** `TodoRateLimiter.java:45-47` — 用 `@Value("${todo.create.rate-limit-per-minute:30}")` 接线配置项。
-- [x] **P2** `TodoCreateVO.java:16`、`TodoController.java:85` — 与系分 W01 出参表对齐 `data.id` 类型（保留 String 则同步修订 `design.md` 出参表）。
-- [x] **P2** `TodoRateLimiter.java:40,66-68` — 为 `timestamps` 增加空闲用户条目淘汰（定期清理或 Caffeine 过期缓存）。
-- [x] **P2** `AuditIntegrationImpl.java:85-95` — shutdown 前排空/记录剩余事件数量，丢弃时输出 ERROR 并计数。
-- [x] **P2** `GatewayAuthIntegrationImpl.java:74`、`TodoValidatorTest.java:67`、`TodoValidatorTest.java:133` — 按 120 字符换行。
-- [x] **P2** `TodoConstants.java:156,166` — 删除未引用常量 `SNOWFLAKE_WORKER_ID_BITS`、`TODO_NO_FALLBACK_SUFFIX_LENGTH`（或补齐降级实现）。
-- [x] **P2** `TodoServiceImplTest.java:136-154` — 补充「索引名不可识别仍返回首次结果」、跨租户隔离、`/create` 缺 `requestId` 错误码映射用例。
-- [x] **P2** `SnowflakeSequenceProvider.java:111-118` — `waitUntil` 改为短 `Thread.sleep` 等待，并设置时钟回拨告警阈值。
-
----
-
-## 9. 验证与残留风险
-
-| 验证项 | 状态 | 说明 |
-|--------|:----:|------|
-| `scan-all-rules.sh`（52/222 条可程序化规则） | ✅ 已执行 | 10 条命中，7 条 `G16.2` 复核为误报，3 条有效（`M016`、`A3.4`×2） |
-| 逐 ID 人工核销（G1–G17 / S1–S10 / B001–B081 / M001–M027 / I001–I010） | ✅ 已执行 | 见 checklist §4.1–§4.3，`⬜` 计数为 0 |
-| 编译 / 单测执行 | ⚠️ **未执行** | 本沙箱 **无 JDK / Maven / Gradle**（`java`/`javac`/`mvn`/`gradle` 均 MISSING，`/usr/lib/jvm`、`/tmp/*jdk*` 为空），无法运行 `mvn test`。**本报告的可靠性结论为静态审查结论，未获运行时证据支撑**；`impl.md` 声明的「84 用例通过」为编码节点自述，本轮未复验 |
-| SQL / MyBatis 一致性 | ✅ 静态核对 | `TodoItemMapper.xml` 字段与 `todo_item.sql` 全部对齐；`#{}` 全参数化；`useGeneratedKeys` 回填 `id` |
-| 残留风险 | — | ①无运行时验证，`TodoItemManager` 冲突解析在真实 MySQL 驱动下的行为（含 `constraintName=""`）只能静态推断；②`@Transactional` 内重试取号依赖「InnoDB 唯一键冲突不中止事务」这一前提，未经真实 DB 验证；③限流与雪花取号的并发表现未经压测 |
-
+- [ ] **P2** `src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:130` — `G16.1` 成功指标与成功日志移至 `afterCommit`，避免提交失败仍计成功
+- [ ] **P2** `src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:136` — `G16.1` 失败指标按异常类型映射（存储异常 TODO_0008 / 其他 TODO_0011），与响应码一致
+- [ ] **P2** `src/main/java/com/antdigital/todo/service/component/TodoMetrics.java:190` — `G16.1` 预注册/缓存 `Counter`，去掉请求路径上的 `register`
+- [ ] **P2** `src/main/resources/mapper/TodoItemMapper.xml:49` — `G4.2` 幂等回查去掉 `is_deleted = 0` 或与唯一索引语义对齐，避免逻辑删除后误报 TODO_0007
+- [ ] **P2** `src/main/java/com/antdigital/todo/service/component/TodoRateLimiter.java:91` — `G13` 空闲条目清理改为定时/分片执行，消除请求路径 O(n) 扫描
+- [ ] **P2** `src/main/java/com/antdigital/todo/common/constant/TodoConstants.java:68` — `A4.4` 删除死常量 `DEFAULT_RATE_LIMIT_PER_MINUTE` 或改由配置绑定引用
+- [ ] **P2** `src/main/java/com/antdigital/todo/service/component/TodoCreateGate.java:68` — `G13.1` 开关拦截与灰度拦截在指标/日志上区分原因
+- [ ] **P2** `src/main/resources/application.yml:29` — `S9` 生产环境强制签名校验（`prod` 关闭即启动失败）
+- [ ] **P2** `src/main/java/com/antdigital/todo/controller/TodoController.java:70` — `G10.1` 改用 `HttpHeaders` 或显式头参数，避免重复头丢值
+- [ ] **P2** `src/main/java/com/antdigital/todo/integration/impl/AuditIntegrationImpl.java:110` — `G8.4` 中断后再 join/二次统计，保证停机丢弃计数准确
+- [ ] **P2** `src/main/java/com/antdigital/todo/service/impl/TodoServiceImpl.java:23` — `A2.4` 按完整名 ASCII 升序调整 import 分组（全仓库统一执行）
