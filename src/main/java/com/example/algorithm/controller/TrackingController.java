@@ -27,6 +27,11 @@ public class TrackingController {
             @RequestParam String dimension,
             @RequestParam String startTime,
             @RequestParam String endTime) {
+        if (dimension == null || dimension.isBlank()
+                || startTime == null || startTime.isBlank()
+                || endTime == null || endTime.isBlank()) {
+            throw new IllegalArgumentException("dimension, startTime and endTime are required");
+        }
         TrackingStatisticsResponse response = trackingService.queryStatistics(dimension, startTime, endTime);
         return ApiResponse.ok(response);
     }
@@ -37,6 +42,11 @@ public class TrackingController {
             @RequestParam String startTime,
             @RequestParam String endTime,
             @RequestParam(required = false) String algorithmType) {
+        if (timeGranularity == null || timeGranularity.isBlank()
+                || startTime == null || startTime.isBlank()
+                || endTime == null || endTime.isBlank()) {
+            throw new IllegalArgumentException("timeGranularity, startTime and endTime are required");
+        }
         TrendResponse response = trackingService.queryTrend(timeGranularity, startTime, endTime, algorithmType);
         return ApiResponse.ok(response);
     }

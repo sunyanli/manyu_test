@@ -7,6 +7,9 @@ import com.example.algorithm.service.ExportService;
 import com.example.algorithm.service.ExportTaskService;
 import org.springframework.stereotype.Service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -19,6 +22,8 @@ import java.util.UUID;
  */
 @Service
 public class ExportServiceImpl implements ExportService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ExportServiceImpl.class);
 
     private final AlgorithmExportTaskMapper exportTaskMapper;
     private final ExportTaskService exportTaskService;
@@ -60,6 +65,7 @@ public class ExportServiceImpl implements ExportService {
         try {
             return new FileInputStream(new File(task.getFileUrl()));
         } catch (IOException e) {
+            LOG.error("Failed to download export file for task: {}", taskId, e);
             return new ByteArrayInputStream(new byte[0]);
         }
     }

@@ -22,7 +22,8 @@ public class AlgorithmCallRecordSqlProvider {
         return "SELECT " + validated + " AS dimension_key, COUNT(*) AS count "
                 + "FROM algorithm_call_record "
                 + "WHERE gmt_create >= #{startTime} AND gmt_create <= #{endTime} "
-                + "GROUP BY " + validated;
+                + "GROUP BY " + validated + " "
+                + "LIMIT 10000";
     }
 
     public String selectTrend(Map<String, Object> params) {
@@ -33,7 +34,8 @@ public class AlgorithmCallRecordSqlProvider {
                 + "WHERE gmt_create >= #{startTime} AND gmt_create <= #{endTime} "
                 + "AND (#{algorithmType} IS NULL OR algorithm_type = #{algorithmType}) "
                 + "GROUP BY DATE_FORMAT(gmt_create, '" + validatedFormat + "') "
-                + "ORDER BY time_label";
+                + "ORDER BY time_label "
+                + "LIMIT 10000";
     }
 
     /**

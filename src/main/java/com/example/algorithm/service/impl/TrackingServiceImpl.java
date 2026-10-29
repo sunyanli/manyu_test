@@ -34,8 +34,10 @@ public class TrackingServiceImpl implements TrackingService {
 
     @Override
     @Async
-    public void recordCall(String apiPath, String algorithmType, String params, String result, int costTimeMs,
-                             String callerId, String callerName, String callerType, String callerLevel, String callerDept) {
+    public void recordCall(String apiPath, String algorithmType, String params,
+                             String result, int costTimeMs, String callerId,
+                             String callerName, String callerType, String callerLevel,
+                             String callerDept) {
         try {
             AlgorithmCallRecord record = new AlgorithmCallRecord();
             record.setRequestId(UUID.randomUUID().toString().replace("-", ""));
@@ -58,7 +60,8 @@ public class TrackingServiceImpl implements TrackingService {
     @Override
     public TrackingStatisticsResponse queryStatistics(String dimension, String startTime, String endTime) {
         String validatedDimension = AlgorithmCallRecordSqlProvider.validateDimension(dimension);
-        List<Map<String, Object>> rows = callRecordMapper.selectStatisticsByDimension(validatedDimension, startTime, endTime);
+        List<Map<String, Object>> rows = callRecordMapper.selectStatisticsByDimension(
+                validatedDimension, startTime, endTime);
         List<TrackingStatisticsResponse.StatisticsItem> items = new ArrayList<>();
         for (Map<String, Object> row : rows) {
             String key = row.get("dimension_key") != null ? row.get("dimension_key").toString() : "UNKNOWN";
@@ -89,7 +92,8 @@ public class TrackingServiceImpl implements TrackingService {
     @Override
     public TrackingStatisticsResponse queryDistribution(String dimension, String startTime, String endTime) {
         String validatedDimension = AlgorithmCallRecordSqlProvider.validateDimension(dimension);
-        List<Map<String, Object>> rows = callRecordMapper.selectStatisticsByDimension(validatedDimension, startTime, endTime);
+        List<Map<String, Object>> rows = callRecordMapper.selectStatisticsByDimension(
+                validatedDimension, startTime, endTime);
         List<TrackingStatisticsResponse.StatisticsItem> items = new ArrayList<>();
         long total = 0;
         for (Map<String, Object> row : rows) {

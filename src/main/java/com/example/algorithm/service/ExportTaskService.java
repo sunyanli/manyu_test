@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 /**
  * Async task service for export operations.
@@ -52,12 +53,12 @@ public class ExportTaskService {
         task.setStatus(status);
         task.setFileUrl(fileUrl);
         task.setErrorMsg(errorMsg);
-        task.setGmtModified(LocalDateTime.now());
+        task.setGmtModified(LocalDateTime.now(ZoneId.systemDefault()));
         exportTaskMapper.updateStatus(task);
     }
 
     private String generateExportContent(String algorithmType, Object params) {
         return "algorithm_type,params,export_time\n"
-                + algorithmType + "," + params + "," + LocalDateTime.now() + "\n";
+                + algorithmType + "," + params + "," + LocalDateTime.now(ZoneId.systemDefault()) + "\n";
     }
 }
