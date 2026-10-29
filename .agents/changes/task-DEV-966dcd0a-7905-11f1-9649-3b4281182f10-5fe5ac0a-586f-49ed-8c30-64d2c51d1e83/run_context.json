@@ -1,15 +1,15 @@
 {
-  "blocker_count": 4,
+  "blocker_count": 1,
   "review_summary": {
-    "p0_count": 4,
-    "p1_count": 5,
+    "p0_count": 1,
+    "p1_count": 4,
     "p2_count": 3,
-    "merge_recommendation": "修复后合并（需修复P0问题）",
+    "merge_recommendation": "修复后合并",
     "key_issues": [
-      "SQL注入: AlgorithmCallRecordMapper使用`${dimension}`拼接SQL",
-      "CORS配置允许所有来源(CorsConfig.allowedOrigins('*'))",
-      "导出功能不完整: ExportServiceImpl仅创建PENDING记录,缺少异步执行和文件生成",
-      "@Async埋点caller信息丢失: TrackingServiceImpl中RequestContextHolder在异步线程失效"
+      "ExportServiceImpl.java:62 catch IOException 无日志记录，异常被静默吞掉",
+      "ExportTaskService.java:55,61 LocalDateTime.now() 未显式指定时区(M016)",
+      "TrackingController.java:26,34 查询接口入参缺少校验，存在 NPE 风险(G11.3)",
+      "AlgorithmCallRecordMapper.java:30-35 统计查询无分页，大数据量可能 OOM(G4.3)"
     ]
   }
 }
