@@ -1,12 +1,14 @@
 # Code Review Report
 
-> **Change** `todo-create`（新增待办事项） · **分支/Commit** `task/DEV-966dcd0a-7905-11f1-9649-3b4281182f10-75a6d105-1e54-442f-a3d4-a6fda5a9c6ad` / `61a3d8a` · **日期** 2026-10-29 · **审查者** AI
+> **Change** `todo-create`（新增待办事项，最小闭环） · **分支** `task/DEV-966dcd0a-7905-11f1-9649-3b4281182f10-75a6d105-1e54-442f-a3d4-a6fda5a9c6ad` / **Commit** `00bc14d` · **日期** 2026-10-29 · **审查者** AI
 >
 > **AI**：等级 **P0 / P1 / P2**；G/S 以 checklist 行内定义为准；Bug 模式以 `bug-pattern-checklist.md` 表头为准（Blocker→P0、Major→P1、Info→P2）。已先运行 `scan-all-rules.sh`（52/222 条）并将要点并入 §5，再写 LLM 结论。
 >
-> **配套清单**：`.agents/20261029-目标_帮助用户记录日常待办事项_核心功能/2026-10-29-todo-create-cr-checklist.md`（Step 1–5 全量核销源）
+> **复审轮次**：第 2 轮（**修复后复审**）。上轮基于 `61a3d8a`，结论为 P0×2 / P1×3 / P2×7、阻止合并；本轮针对 `问题修复` 提交 `00bc14d`（`+1294 / -76`）逐项核销，并复核修复引入的新风险。
 >
-> **验证基线**：`mvn -o test` → `Tests run: 64, Failures: 0, Errors: 0`，`BUILD SUCCESS`（JDK 17 + Maven 3.9.9，离线仓库）。
+> **配套清单**：`.agents/20261029-目标_帮助用户记录日常待办事项_核心功能/2026-10-29-todo-create-cr-checklist.md`（Step 1–5 全量核销源 + 附录 A/B 预扫输出 + Round 2 复审记录）
+>
+> **验证基线**：`JAVA_HOME=zulu17 mvn -o test` → `Tests run: 88, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`（本轮实测，耗时 17.5s）。
 
 ---
 
@@ -14,24 +16,37 @@
 
 | 项 | 值 |
 |----|-----|
-| `.java` 文件数 | `30`（主代码 23 + 测试 7） |
-| 变更行数 | `+2293 / -0`（含 `pom.xml`、`application.yml`、SQL、`design.md`、`impl.md` 等非 Java 文件，已跳过代码审查） |
-| 功能范围 | 最小闭环「新增待办事项」：W01 `POST /api/todo/item/create` |
+| `.java` 文件数 | `24`（主代码 13 + 测试 11），均在本轮 `git diff HEAD~1 --name-only` 中 |
+| 变更行数 | `+1294 / -76` |
+| 非 Java 变更（跳过码审，仅作证据） | `pom.xml`、`src/main/resources/application.yml`、`src/test/resources/application-test.yml`、`fix_report.md` |
+| 功能范围 | 最小闭环「新增待办事项」：W01 `POST /api/todo/item/create` + 横切能力（登录态/网关来源、开关灰度、限流、traceId、指标、访问日志） |
 
-| 类/接口 | 路径 | 角色 |
-|---------|------|------|
-| `TodoApplication` | `src/main/java/com/antdigital/todo/TodoApplication.java` | 启动类、`@MapperScan` |
-| `TodoItemController` | `src/main/java/com/antdigital/todo/item/controller/TodoItemController.java` | W01 接口入口 |
-| `TodoItemService` / `TodoItemServiceImpl` | `src/main/java/com/antdigital/todo/item/service/`、`.../service/impl/` | S01 业务规则 R02~R08、R10 |
-| `TodoItemMapper` / `TodoItemDO` | `src/main/java/com/antdigital/todo/item/mapper/`、`.../model/` | S02 单表写入 |
-| `CreateTodoRequest` / `CreateTodoResponse` | `src/main/java/com/antdigital/todo/item/model/` | 出入参 |
-| `TodoTextNormalizer` | `src/main/java/com/antdigital/todo/item/util/` | R05/R06 规范化与非法字符 |
-| `LoginInterceptor` | `src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java` | R01/R09/R11/R12/R13 |
-| `RateLimitInterceptor` / `TokenBucketRateLimiter` | `.../common/interceptor/`、`.../common/ratelimit/` | 用户级限流（设计 §5.2.3 C03） |
-| `GlobalExceptionHandler` / `BizException` | `src/main/java/com/antdigital/todo/common/exception/` | 统一异常映射 |
-| `ApiResponse` / `ResultCode` | `src/main/java/com/antdigital/todo/common/api/` | 统一出参与错误码 |
-| `OperatorContext` / `OperatorContextHolder` | `src/main/java/com/antdigital/todo/common/context/` | 登录态 ThreadLocal 上下文 |
-| `TodoCreateProperties` / `TrustedGatewayProperties` / `WebMvcConfig` | `src/main/java/com/antdigital/todo/common/` | 开关/灰度/限流/白名单配置与拦截器注册 |
+| # | 类/接口 | 路径 | 角色 |
+|---|---------|------|------|
+| 1 | `TodoCreateProperties` | `src/main/java/com/antdigital/todo/common/config/TodoCreateProperties.java` | 开关/灰度/限流静态绑定（兜底源） |
+| 2 | `TodoCreateSettings` | `src/main/java/com/antdigital/todo/common/config/TodoCreateSettings.java` | **新增**：运行期实时读取配置（G17.1） |
+| 3 | `GlobalExceptionHandler` | `src/main/java/com/antdigital/todo/common/exception/GlobalExceptionHandler.java` | 统一异常映射 + 失败指标 + traceId |
+| 4 | `LoginInterceptor` | `src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java` | R01/R09/R11/R12/R13 + 访问日志 |
+| 5 | `RateLimitInterceptor` | `src/main/java/com/antdigital/todo/common/interceptor/RateLimitInterceptor.java` | 用户级限流（设计 C03） |
+| 6 | `TodoCreateMetrics` | `src/main/java/com/antdigital/todo/common/metrics/TodoCreateMetrics.java` | **新增**：Micrometer 业务指标（G16.1） |
+| 7 | `TokenBucketRateLimiter` | `src/main/java/com/antdigital/todo/common/ratelimit/TokenBucketRateLimiter.java` | 令牌桶 + 空闲淘汰 |
+| 8 | `GatewayIpMatcher` | `src/main/java/com/antdigital/todo/common/security/GatewayIpMatcher.java` | **新增**：白名单精确 IP / IPv4 CIDR 匹配（S8.1） |
+| 9 | `TrustedGatewayProperties` | `src/main/java/com/antdigital/todo/common/security/TrustedGatewayProperties.java` | 白名单配置（fail-closed 语义） |
+| 10 | `TraceContext` | `src/main/java/com/antdigital/todo/common/trace/TraceContext.java` | **新增**：traceId ThreadLocal + MDC（G16.2） |
+| 11 | `TraceIdFilter` | `src/main/java/com/antdigital/todo/common/trace/TraceIdFilter.java` | **新增**：入口生成/透传 + `finally` 清理（G8.5） |
+| 12 | `TodoConstants` | `src/main/java/com/antdigital/todo/item/constant/TodoConstants.java` | 常量整改（删除死常量、新增换算/属性键） |
+| 13 | `TodoItemServiceImpl` | `src/main/java/com/antdigital/todo/item/service/impl/TodoItemServiceImpl.java` | R02~R08/R10 + 成功指标埋点 |
+| 14 | `TodoCreateSettingsTest` | `src/test/java/com/antdigital/todo/common/config/TodoCreateSettingsTest.java` | 热更新/回落（3 例） |
+| 15 | `LoginInterceptorTest` | `src/test/java/com/antdigital/todo/common/interceptor/LoginInterceptorTest.java` | 拒绝路径清理、空白名单、CIDR、超长 Header（12 例） |
+| 16 | `RateLimitInterceptorTest` | `src/test/java/com/antdigital/todo/common/interceptor/RateLimitInterceptorTest.java` | 限流/无上下文放行（2 例） |
+| 17 | `TodoCreateMetricsTest` | `src/test/java/com/antdigital/todo/common/metrics/TodoCreateMetricsTest.java` | 成功/失败分桶（2 例） |
+| 18 | `TokenBucketRateLimiterTest` | `src/test/java/com/antdigital/todo/common/ratelimit/TokenBucketRateLimiterTest.java` | 限流 + 空闲淘汰（4 例） |
+| 19 | `GatewayIpMatcherTest` | `src/test/java/com/antdigital/todo/common/security/GatewayIpMatcherTest.java` | 精确/CIDR/非法表达式 fail-closed（5 例） |
+| 20 | `TraceContextTest` | `src/test/java/com/antdigital/todo/common/trace/TraceContextTest.java` | 生成/透传/防注入/清理（4 例） |
+| 21 | `TodoCreateIntegrationTest` | `src/test/java/com/antdigital/todo/item/controller/TodoCreateIntegrationTest.java` | 真实容器 + H2 端到端（7 例） |
+| 22 | `TodoItemControllerTest` | `src/test/java/com/antdigital/todo/item/controller/TodoItemControllerTest.java` | 出参/错误码（适配新构造） |
+| 23 | `TodoItemServiceImplTest` | `src/test/java/com/antdigital/todo/item/service/impl/TodoItemServiceImplTest.java` | 业务规则 + `recordSuccess` 断言 |
+| 24 | `TodoTextNormalizerTest` | `src/test/java/com/antdigital/todo/item/util/TodoTextNormalizerTest.java` | 规范化/非法字符（行宽整改） |
 
 ---
 
@@ -39,93 +54,116 @@
 
 | P0 | P1 | P2 |
 |----|----|-----|
-| 2 | 3 | 7 |
+| 0 | 1 | 6 |
 
-> **blocker_count = 2**（P0-1、P0-2）。§8 中 P0 任务为 3 条，其中 1 条是上述两个 P0 的**回归用例锁定**，不额外计入阻塞缺陷数。
+> **blocker_count = 0**。上轮 2 个 P0（ThreadLocal 残留、网关白名单 fail-open）经代码复核 + 新增回归用例 + 本轮实测全绿，均判定 **已闭合**；本轮新增问题无 P0。
 
 ---
 
 ## 3. Step 2 — 功能（REQ）
 
-### REQ-1: 新增待办主流程（F01）
+### 3.1 上轮 P0/P1 修复核销（本轮重点）
+
+| 上轮编号 | 结论 | 代码证据 | 测试证据 |
+|----------|------|----------|----------|
+| P0-1 `G8.5` ThreadLocal 拒绝路径残留 | ✅ 已闭合 | `LoginInterceptor.java:63-74`（全部校验通过后才 `set`）+ `:75-81`（`catch` → `handleRejected`）+ `:155-159`（拒绝即 `clear()`）+ `TraceIdFilter.java:33-37`（`finally` 清 MDC） | `LoginInterceptorTest#should_throwTodo007_andClearContext_when_switchOff`、`#should_throwTodo006_andClearContext_when_tenantSuffixNotInGrayList`、`#should_throwTodo002_when_trustedIpListEmpty`（均断言 `OperatorContextHolder.get()` 为 `null`）；`TodoCreateIntegrationTest#should_rejectAndClearContext_when_switchOffAtRuntime`（真实容器） |
+| P0-2 `S8.1`/R11 白名单 fail-open | ✅ 已闭合 | `LoginInterceptor.java:99-113`（空 → ERROR 安全告警 + `TODO_002`；非命中 → WARN + `TODO_002`），`GatewayIpMatcher.java:34-58`（空/非法一律不匹配），`application.yml:46`（`${TRUSTED_GATEWAY_IPS:127.0.0.1}`） | `LoginInterceptorTest#should_throwTodo002_when_trustedIpListEmpty`、`#should_throwTodo002_when_sourceIpNotTrusted`、`#should_pass_when_sourceIpMatchesCidr`、`GatewayIpMatcherTest`（5 例）、`TodoCreateIntegrationTest#should_returnTodo002_when_sourceIpNotTrusted`（且校验不落库） |
+| P1-1 `G16.1` 指标/访问日志缺失 | ✅ 已闭合（残留 P2-2） | `TodoCreateMetrics.java:44-59`、`TodoItemServiceImpl.java:68`、`GlobalExceptionHandler.java:92-96`、`LoginInterceptor.java:166-176`、`pom.xml:54-57`、`application.yml:21-29` | `TodoCreateMetricsTest`（2 例）、`TodoItemServiceImplTest`（`verify(recordSuccess)`）、`TodoCreateIntegrationTest#should_recordMetrics_when_createSucceeds` |
+| P1-2 `G16.2`/REQ-7 traceId 未生成 | ✅ 已闭合 | `TraceContext.java:37-45`（合法透传 / 非法或缺失生成 UUID）、`:59-62`（ThreadLocal+MDC 双清）、`TraceIdFilter.java:31-37`（回写响应头）、`application.yml:48-51`（日志 pattern 带 `%X{traceId:-}`） | `TraceContextTest`（4 例，含换行注入与 65 字符拒绝）、`TodoCreateIntegrationTest#should_generateTraceId_when_headerAbsent`（响应头 32 位） |
+| P1-3 `G17.1` 开关/灰度不支持热更新 | ✅ 已闭合 | `TodoCreateSettings.java:40-92`（每次读取实时 `Binder` 解析，缺失回落 properties）；`LoginInterceptor`/`RateLimitInterceptor` 改为依赖该读取器 | `TodoCreateSettingsTest#should_reflectChangedConfiguration_withoutRestart`、`TodoCreateIntegrationTest#should_rejectAndClearContext_when_switchOffAtRuntime`（运行期注入 `todo.create.enabled=false` 后立即 `TODO_007`） |
+
+### 3.2 需求功能点
+
+#### REQ-1: 新增待办主流程（F01）
 
 | Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
 |----------|------|----------|----------|------|
-| Given 合法登录态与 `title`/`description`，When `POST /api/todo/item/create`，Then 落库 1 条并返回 `result=OK`、`data.id/title/status/gmtCreate` | ✅ | design §4.1 W01、§5.1.2 出参表 | `TodoItemController.java:39-46`；`TodoCreateIntegrationTest.java:49-81`（真实 INSERT 回查） | 主键回填、`status=0`、`gmtCreate` 格式均验证通过 |
+| Given 合法登录态与 `title`/`description`，When `POST /api/todo/item/create`，Then 落库 1 条并返回 `result=OK`、`data.id/title/status/gmtCreate` | ✅ | design §4.1 W01、§5.1.2 出参表 | `TodoItemController.java:39-46`；`TodoCreateIntegrationTest.java:60-98`（真实 INSERT 回查 7 个字段） | 修复未改动主流程，回归通过 |
 
-### REQ-2: 入参校验与文本规范化（F02）
-
-| Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
-|----------|------|----------|----------|------|
-| 名称空白 → TODO_001「事项名称不能为空」；名称 >100 → TODO_001；描述 >500 → TODO_001；含控制字符 → TODO_005 | ✅ | design §5.1.3.1 R02~R06 | `TodoItemServiceImpl.java:66-86`、`TodoTextNormalizer.java:25-76`；`TodoItemServiceImplTest.java:105/120/133/151/164` | 均不落库（`verify(..., never())`） |
-
-### REQ-3: 创建人与租户归属识别（F03）
+#### REQ-2: 入参校验与文本规范化（F02）
 
 | Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
 |----------|------|----------|----------|------|
-| `tenant_id`/`creator_id` 只取自 `OperatorContext`；`status` 固定 0；`creator_name` 缺失以 userId 兜底 | ✅ | design R07/R08、§6.4.2.1 | `TodoItemServiceImpl.java:88-108`；`TodoCreateIntegrationTest.java:73-78` | Body 无同名参数入口，无法覆盖归属 |
+| 名称空白/超 100 字符 → TODO_001；描述超 500 → TODO_001；控制字符 → TODO_005 | ✅ | design §5.1.3.1 R02~R06 | `TodoItemServiceImpl.java:52-92`、`TodoTextNormalizer.java:25-76`、`CreateTodoRequest.java:19-25` | 规范化后按码点计数，emoji 计 1 字符 |
 
-### REQ-4: 登录态与来源校验（R11/R12/R13）
-
-| Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
-|----------|------|----------|----------|------|
-| 登录 Header 缺失/超长 → TODO_002；`tenantId` 参数不一致 → TODO_003；来源 IP 不在白名单 → TODO_002 | ⚠️ | design §5.2.3 R11/R12/R13、§6.4.2.3 | `LoginInterceptor.java:42-67`；`LoginInterceptorTest.java:81/94/108` | R12/R13 达成；**R11 在 `trusted-gateway-ips` 为空时整体跳过**（默认配置即为空）→ 见 **P0-2** |
-
-### REQ-5: 开关与灰度（R09）
+#### REQ-3: 创建人与租户归属识别（F03）
 
 | Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
 |----------|------|----------|----------|------|
-| 总开关关闭 → TODO_007；灰度未命中 → TODO_006；命中 → 放行 | ✅ | design §7.2、§7.3、R09 | `LoginInterceptor.java:85-96`；`LoginInterceptorTest.java:123/137/152` | 语义正确；但拒绝路径上下文未清理 → 见 **P0-1** |
+| `tenant_id`/`creator_id` 只取自 `OperatorContext`；`status` 固定 0；`creator_name` 缺失以 userId 兜底 | ✅ | design R07/R08、§6.4.2.1 | `LoginInterceptor.java:58-74`；`TodoItemServiceImpl.java:94-114`；`TodoCreateIntegrationTest.java:86-92` | Body 无同名入参入口；修复后归属注入时机更安全（校验通过后） |
 
-### REQ-6: 落库失败统一降级（R10）
-
-| Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
-|----------|------|----------|----------|------|
-| 持久化异常 / 影响行数≠1 → TODO_004，不暴露 SQL 细节 | ✅ | design R10、§5.2.3 C02 | `TodoItemServiceImpl.java:57-62, 110-119`；`TodoItemServiceImplTest.java:198-208` | `DataAccessException` 捕获后记 ERROR 含 `tenantId/creatorId` + 异常栈 |
-
-### REQ-7: 链路追踪与可监控（`X-Trace-Id`、指标、访问日志）
+#### REQ-4: 登录态与来源校验（R11/R12/R13）
 
 | Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
 |----------|------|----------|----------|------|
-| Header 表：「`X-Trace-Id` 缺失时应用生成」 | ❌ | design §4.1 入参 Header 表 | `LoginInterceptor.java:55` 仅读取打印；无生成逻辑、无 MDC | 见 **P1-2** |
-| 指标：QPS、P99 RT、错误码分布（TODO_001~007 分桶）、DB insert 耗时、连接池活跃数 | ❌ | design §6.5 指标表、§7.1 可监控 | `pom.xml` 未引入 `micrometer-registry-*`，全仓无 `MeterRegistry`/`@Timed`；仅 `spring-boot-starter-actuator` 默认 JVM/HTTP 指标 | 见 **P1-1** |
-| 访问日志（traceId、userId、tenantId、耗时、结果码） | ❌ | design §6.5 日志行 | 无访问日志实现（无 `HandlerInterceptor.afterCompletion` 耗时打点、无 AOP） | 见 **P1-1** |
+| 登录 Header 缺失/超长 → TODO_002；`tenantId` 参数不一致 → TODO_003；来源 IP 不在白名单 → TODO_002 | ✅ | design §5.2.3 R11/R12/R13、§6.4.2.1 | `LoginInterceptor.java:63-68,99-121,123-128`；`LoginInterceptorTest.java:104-166` | **上轮 P0-2 已闭合**：空列表不再等价放行；白名单支持 `10.0.0.0/24` |
 
-### REQ-8: 统一出参与错误码
+#### REQ-5: 开关与灰度（R09）
 
 | Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
 |----------|------|----------|----------|------|
-| 失败返回 `{result,msg,data=null}`；TODO_001~007 与设计一致 | ✅ | design §5 全局约定、§5.1.1.2 | `ApiResponse.java:30-54`、`ResultCode.java:13-34`、`GlobalExceptionHandler.java:30-71`；`TodoItemControllerTest.java:85/99/110/126` | 文案「事项名称不能为空」等与设计原文一致 |
+| 总开关关闭 → TODO_007；灰度未命中 → TODO_006；命中 → 放行；改配置免重启 | ✅ | design §7.2、§7.3、R09 | `LoginInterceptor.java:130-146`、`TodoCreateProperties.java:16-23`、`application.yml:31-42` | 校验顺序前移，异常路径不再残留上下文；运行期改动即时生效 |
 
-### REQ-9: 建表脚本
+#### REQ-6: 落库失败统一降级（R10）
 
 | Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
 |----------|------|----------|----------|------|
-| 9 字段类型/默认值、`PRIMARY`、`idx_todo_item_tenant_creator(tenant_id,creator_id,gmt_create)` | ✅ | design §5.1.1.1 | `src/main/resources/db/todo_item.sql:2-14` | 与设计逐列一致；无外键、无触发器 |
+| 持久化异常 / 影响行数≠1 → TODO_004，不暴露 SQL 细节 | ✅ | design R10、§5.2.3 C02 | `TodoItemServiceImpl.java:63-67,116-125` | catch 内 ERROR 带 `tenantId/creatorId` + 异常栈 |
+
+#### REQ-7: 链路追踪与可监控（`X-Trace-Id`、指标、访问日志）
+
+| Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
+|----------|------|----------|----------|------|
+| `X-Trace-Id` 缺失时应用生成，并回写响应头、进入日志 | ✅ | design §4.1 入参 Header 表、§6.5 日志行 | `TraceContext.java:37-45`、`TraceIdFilter.java:31-37`、`application.yml:48-51` | 上轮 P1-2 闭合 |
+| 指标：QPS、P99 RT、错误码分布（TODO_001~007 分桶）、连接池活跃数 | ✅ | design §6.5 指标表 | `TodoCreateMetrics.java:44-59`、`GlobalExceptionHandler.java:92-96`、`application.yml:21-29` | 连接池活跃数由 Hikari 自动指标覆盖；**「DB insert 耗时」未独立打点**（记的是整段 service 耗时）→ P2-2 |
+| 访问日志（traceId、userId、tenantId、耗时、结果码） | ✅ | design §6.5 日志行、§7.1 | `LoginInterceptor.java:84-92,155-176` | 成功与拒绝分支均输出，拒绝分支从请求属性兜底取值 |
+| 统计：每日新增待办条数（按租户聚合） | ⚠️ | design §6.5「统计」行 | 无专用实现 | 可由 `todo_item` 按 `tenant_id + gmt_create` 聚合直接得出，本期最小闭环可接受 → 并入 P2-2 说明，不单列 |
+
+#### REQ-8: 统一出参与错误码
+
+| Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
+|----------|------|----------|----------|------|
+| 失败返回 `{result,msg,data=null}`；TODO_001~007 与设计一致 | ✅ | design §5 全局约定、§5.1.1.2、§5.2.3 错误码表 | `ApiResponse.java:30-54`、`ResultCode.java:13-34`、`GlobalExceptionHandler.java:45-96`、`RateLimitInterceptor.java:48`（限流 → TODO_004，与设计 §5.2.3「超限返回 TODO_004」一致） | 文案与设计原文逐条一致 |
+
+#### REQ-9: 建表脚本
+
+| Scenario | 结果 | Spec证据 | 代码证据 | 说明 |
+|----------|------|----------|----------|------|
+| 9 字段类型/默认值、`PRIMARY`、`idx_todo_item_tenant_creator(tenant_id,creator_id,gmt_create)` | ✅ | design §5.1.1.1 | `src/main/resources/db/todo_item.sql:2-15` | 本轮无表结构变更（G15.1 向前兼容） |
 
 ---
 
 ## 4. Step 3 — 可读性检查
 
-> 无 Java：**N/A**。（本次有 Java，全量执行）
+> 本次有 Java，全量执行 A1–A7。
 
 | 结果 | 说明（违规写 Ax.x 与 `path:行`） |
 |------|--------------------------------|
-| ⚠️ | **A2.4**：`GlobalExceptionHandler.java:7-12` 中 `org.springframework.http.converter.HttpMessageNotReadableException` 位于 `org.springframework.validation.*`、`org.springframework.web.bind.*` 之后，非 ASCII 字典序 → **P2-1** |
-| ⚠️ | **A3.4**：4 处行宽 >120：`TodoConstants.java:40`(122)、`TokenBucketRateLimiter.java:9`(125)、`TodoCreateIntegrationTest.java:25`(126)、`TodoTextNormalizerTest.java:34`(127) → **P2-2** |
-| ✅ | A1 文件格式（命名/UTF-8/无 Tab）、A3 其余项（K&R、4 空格）、A4 命名、A5 编码实践（`@Override` 齐全、无空 catch）、A6 元素样式、A7 Javadoc（public 类与方法齐全，getter 省略符合 A7.3） |
+| ✅ | **A2.4 已整改**：`GlobalExceptionHandler.java:10-15` import 现按完整引入名 ASCII 序（`http.converter` 在 `validation` 之前） |
+| ✅ | **A3.4 已整改**：变更内 24 个 `.java` 逐行复测，无 >120 列（全仓仅 `src/test/java/com/antdigital/sort/SortUtilTest.java:19` 超宽，属既有排序模块、非本次变更，不计入） |
+| ✅ | A1 文件格式（命名/UTF-8/无 Tab）、A3 其余项（K&R、4 空格）、A4 命名、A5 编码实践（`@Override` 齐全、无空 catch、无 `System.out`/`printStackTrace`）、A6 元素样式、A7 Javadoc（新增 5 个类均有类级/方法级注释，getter 省略符合 A7.3） |
 
 ---
 
 ## 5. Step 4 — 可靠性检查
 
+> **预扫（强制）**：`bash references/script/scan-all-rules.sh src/main/java/com/antdigital/todo src/test/java/com/antdigital/todo` → `5 findings (P0=5) | 52/222 rules scanned`，全部为 `G16.2 — CatchWithoutLogging`。逐条人工复核结果见下表末尾「预扫复核」。
+
 | 域 | 参考 | 结果 | 等级 | 说明（列命中 ID 或「已扫无命中」） |
 |----|------|------|------|-------------------------------------|
-| 可靠性 | `reliability-checklist.md` G1–G17 | ❌ | P0 | `G8.5` ThreadLocal 拒绝路径未清理（`LoginInterceptor.java:69-78`）→ **P0-1**；`G16.1` 无指标/访问日志 → **P1-1**；`G16.2` 异常日志无 traceId → **P1-2**；`G17.1` 开关不热更新 → **P1-3**；`G8.1` 令牌桶无淘汰 → **P2-4**；`G11.2` 漏测拒绝路径 → **P2-5** |
-| 安全 | `security-checklist.md` S1–S10 | ❌ | P0 | `S8.1` 来源网关校验 fail-open（`LoginInterceptor.java:43-48` + `application.yml:45`）→ **P0-2**；其余 S1/S2/S6/S9/S10 已扫无命中（无 SQL 拼接、无富文本、无多态反序列化、凭证走环境变量、无 CORS 通配） |
-| Bug 模式 | `bug-pattern-checklist.md` B/M/I（120） | ✅ | — | 预扫 `scan-all-rules.sh`：`[P0] G16.2 — CatchWithoutLogging: TodoItemServiceImpl.java:113`，**人工复核为误报**（catch 内已 `LOGGER.error(..., ex)`）。逐条核销 B001–B081 / M001–M027 / I001–I010 无 Blocker/Major 命中 |
+| 可靠性 | `reliability-checklist.md` G1–G17 | ⚠️ | P2 | `G8.5` **已闭合**（`LoginInterceptor.java:75-81,155-159` + `TraceIdFilter.java:33-37`）；`G16.1` ✅ 指标/访问日志落地；`G16.2` ⚠️ `GatewayIpMatcher.java:105-107` IPv4 解析失败静默返回 `-1`（P2-1）；`G17.1` ✅ 运行期配置读取；`G8.1` ✅ 令牌桶空闲淘汰；`G11.2` ⚠️ 缺 `X-User-Name` 超长用例（并入 P2-3） |
+| 安全 | `security-checklist.md` S1–S10 | ⚠️ | P1 | `S8.1` **业务链路已闭合**（fail-closed + 回归用例）；但新增的 Prometheus/actuator 端点被两个拦截器显式排除且无任何鉴权 → **P1-1**。其余 S1/S2/S3/S4/S5/S6/S7/S9/S10 已扫无命中（无 `${}` 拼接、无富文本、无外部 URL/命令执行/XML/文件上传、凭证走环境变量、无 CORS 通配） |
+| Bug 模式 | `bug-pattern-checklist.md` B/M/I（120） | ✅ | — | 预扫 5 条 `G16.2` 全部落在 catch 行；逐条核销 B001–B081 / M001–M027 / I001–I010 无 Blocker/Major 命中（`M027` ThreadLocal 为 `static`、`B012` 无 `==` 比较字符串、`B004` 无魔法值散落） |
 
-**注**：`G16.1` 在清单中定级 P0，本报告记为 **P1**——`actuator` 已提供默认 JVM/HTTP 指标，缺的是设计要求的业务维度埋点与访问日志，属可观测性缺口而非功能不可用；其余 P0/P1 与清单定级一致。
+**预扫复核（5 条逐一）**
+
+| 命中 | 判定 | 依据 |
+|------|------|------|
+| `LoginInterceptor.java:75` | 误报 | `catch (BizException ex)` 内调用 `handleRejected(...)`（`:155-159` 内 `clear()` + INFO 访问日志）后原样抛出 |
+| `LoginInterceptor.java:78` | 误报 | 同上，`RuntimeException` 分支最终由 `GlobalExceptionHandler.java:86-90` 以 ERROR + 栈输出 |
+| `GatewayIpMatcher.java:66` | 误报 | `catch (NumberFormatException ex)` 紧邻 `LOGGER.warn("受信网关白名单 CIDR 前缀非法, pattern={}")` |
+| `GatewayIpMatcher.java:105` | **真命中（降级 P2）** | `toIpv4Value` 解析失败直接 `return -1L`，无日志 → 见 P2-1；因结果仍是 fail-closed（拒绝而非放行），且配置错误可在启动/联调阶段暴露，按 **P2** 记录（清单 G16.2 行内为 P1，此处依据影响面降级并留痕） |
+| `TodoItemServiceImpl.java:119` | 误报 | catch 内 `LOGGER.error(..., ex)` 已记录且含归属上下文 |
 
 ---
 
@@ -133,260 +171,176 @@
 
 | 域 | 参考 | 结果 | 等级 | 说明 |
 |----|------|------|------|------|
-| 自定义扩展 | `customized-checklist.md` U* | ✅ | — | `U1.1` Controller 入参使用 `@Valid @RequestBody`（`TodoItemController.java:40`）；`U2.*` 为空节，`N/A(未启用自定义规则)` |
+| 自定义扩展 | `customized-checklist.md` U* | ✅ | — | `U1.1` Controller 入参使用 `@Valid @RequestBody`（`TodoItemController.java:40`）；`U2.*` 无具体规则，`N/A(未启用自定义规则)` |
 
 ---
 
 ## 7. 结论
 
-- **合并建议**：**阻止合并**（2 个 P0 必须修复后复审）
-- **P0**：
-  1. `LoginInterceptor` 在写入 `OperatorContextHolder` 之后、开关/灰度校验抛异常时，`afterCompletion` 不会执行，`ThreadLocal` 残留（已实测复现）。
-  2. 受信网关 IP 白名单默认为空且代码对空列表**整体跳过校验**，任何可达端口的调用方都能伪造 `X-User-Id`/`X-Tenant-Id` 代表他人创建，与设计 R11、§6.4.2.1 直接冲突。
+- **合并建议**：**修复后合并**（P0 已清零；仅 1 项 P1 属可观测性端点暴露，建议随本次发布单一起整改后合并）
+- **P0**：无。上轮 P0-1（ThreadLocal 残留）、P0-2（网关白名单 fail-open）均已闭合，并有单测 + 端到端用例锁定。
 - **P1**：
-  1. 设计要求的指标埋点与访问日志未实现。
-  2. `X-Trace-Id` 仅透传，缺失时不生成、未入 MDC，异常日志无法串联排障。
-  3. 总开关/灰度/限流阈值均为 `@ConfigurationProperties` 静态绑定，无配置中心刷新，与「热更新、应急无需发版」不符。
-- **P2**：import 顺序、4 处行宽、`INSERT_TIMEOUT_MS` 死常量、令牌桶无淘汰、单测漏测项、连接字符集与 utf8mb4 一致性风险、默认配置直接全量放开。
-- **一句话**：主流程、校验、归属与错误码实现扎实且 64 个用例全绿，但**身份信任边界（网关白名单 fail-open）与 ThreadLocal 生命周期**两处 P0 使其当前不具备上线条件。
+  1. `/api/actuator/**` 被登录/限流拦截器整体排除，`metrics`、`prometheus` 端点无鉴权暴露，成为 fail-closed 主链路之外的唯一免校验入口（内部容量、错误码分布、Hikari/JVM 指标可被任意可达方读取）。
+- **P2**：
+  1. `GatewayIpMatcher` IPv4 解析失败静默（排障盲区）。
+  2. `todo.create.cost` 记的是整段 service 耗时而非「DB insert 耗时」；`todo.create.requests` 由全局异常处理器统一打点，非 create 接口的失败也会计入（当前仅一个接口，无实际偏差）；「每日新增按租户聚合」统计未落地（可由表数据聚合）。
+  3. `X-User-Name` 未做长度/字符校验，超 128 字符会退化为 `TODO_004`「系统繁忙」。
+  4. `TodoCreateSettings` 每请求执行 4 次属性绑定，建议进程内缓存 + 变更事件失效。
+  5. 网关白名单仅支持 IPv4，IPv6 来源一律拒绝（fail-closed，但若网关走 IPv6 将全量拒服）。
+  6. `pom.xml` 的 `name/description` 仍为「排序算法核心模块（冒泡排序三变体）」，与应用实际能力不符。
+- **一句话**：两个 P0 的修复方向正确且有回归用例/端到端用例锁定，88 个用例实测全绿，主流程、身份边界、可观测性与应急开关均已达设计基线；剩余风险集中在**新增 actuator 端点的鉴权边界**与少量可维护性细节。
 
 ---
 
 ## 7.1 问题片段（必填）
 
-### P0-1 · `G8.5` · `src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java:69-78`
+### P1-1 · `S8.1` · `src/main/java/com/antdigital/todo/common/config/WebMvcConfig.java:32-41`
 
-- **等级**：P0（阻塞）
-- **规则**：`G8.5`（ThreadLocal 在线程池场景 `finally` 未 `remove()`），关联 `M027`（ThreadLocal 应为 static——本处已合规）
-- **问题**：`preHandle` 先 `set` 上下文，随后 `checkSwitchAndGray(tenantId)` 可能抛 `TODO_007`/`TODO_006`。Spring MVC 仅在 `preHandle` **返回 true** 后才登记 `afterCompletion` 回调，因此异常路径下 `clear()` 永不执行，`OperatorContext` 残留在 Tomcat 工作线程上。
-- **实测证据**（临时探针，已删除）：`todo.create.enabled=false` 时发起请求 → 响应 `result=TODO_007`，随后同线程读取 `OperatorContextHolder.get()` 输出 `PROBE_RESULT_LEAKED=true; userId=U9999`。
-- 片段范围：`src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java:69-78`
-
-```java
-L69|        OperatorContextHolder.set(new OperatorContext(userId, userName, tenantId));
-L70|        checkSwitchAndGray(tenantId);   // 问题：此处抛出 TODO_006/TODO_007 后 afterCompletion 不会回调
-L71|        return true;
-L72|    }
-L73|
-L74|    @Override
-L75|    public void afterCompletion(HttpServletRequest request, HttpServletResponse response,
-L76|                               Object handler, Exception ex) {
-L77|        OperatorContextHolder.clear();  // 仅正常放行/后置异常路径可达
-L78|    }
-```
-
-### P0-2 · `S8.1` / `R11` · `src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java:43-48`
-
-- **等级**：P0（阻塞）
-- **规则**：`S8.1`（接口已接入鉴权，资源操作校验归属权）；功能性不符 R11（P0）
-- **Spec 证据**：design §5.2.3 R11「来源 IP 必须在受信网关白名单内，否则视为未授权访问 → TODO_002，记安全日志」；§6.4.2.1「用户无法以他人身份创建记录」；§2.2「应用只信任网关来源」。
-- **代码证据**：条件 `!trustedIps.isEmpty() && ...` 使**空列表等价于完全关闭校验**；`src/main/resources/application.yml:45` 默认即为 `trusted-gateway-ips: []`，且无 profile 区分生产配置。
-- **后果**：任何能访问应用端口的调用方自带 `X-User-Id`/`X-Tenant-Id` 即可为任意用户/租户创建待办，直接击穿 F03 归属识别与水平权限约束；同时 `G14.2`（租户值来自不可信来源）同源命中。
-- 片段范围：`src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java:42-52`
+- **等级**：P1（合并前应修复）
+- **规则**：`S8.1`（接口鉴权边界），关联 design §6.4.2「应用只信任网关来源」
+- **问题**：登录态与限流拦截器同时 `excludePathPatterns("/api/actuator/**")`，而 `application.yml:21-29` 把 `health,metrics,prometheus` 暴露在同一容器端口 `/api/actuator` 下，`pom.xml` 未引入 `spring-boot-starter-security`，也没有独立 management 端口。结果：主链路 `/api/**` 已 fail-closed，但 `/api/actuator/prometheus`、`/api/actuator/metrics` 对任何能连通应用端口的调用方完全开放，可读取 `todo.create.requests{result=...}` 错误码分布、耗时分布、连接池/JVM 指标。
+- **证据性质**：静态证据（路由 + 排除规则 + 依赖清单）；未做运行时探测（启动需外部 MySQL）。建议修复后用 `curl -s localhost:8080/api/actuator/prometheus`（不带任何 Header）复核应返回 401/404。
+- 片段范围：`src/main/java/com/antdigital/todo/common/config/WebMvcConfig.java:32-41`
 
 ```java
-L42|        // R11：来源 IP 必须在受信网关白名单内（白名单为空时由网络层保证）
-L43|        List<String> trustedIps = gatewayProperties.getTrustedGatewayIps();
-L44|        if (!trustedIps.isEmpty() && !trustedIps.contains(request.getRemoteAddr())) {
-L45|            LOGGER.warn("拒绝非受信网关来源请求, remoteAddr={}, uri={}",
-L46|                    request.getRemoteAddr(), request.getRequestURI());
-L47|            throw new BizException(ResultCode.TODO_002, "未登录或登录态失效");
-L48|        }   // 问题：trustedIps 为空（默认配置）时跳过校验，X-User-Id/X-Tenant-Id 可被任意伪造
-L49|
-L50|        // R12：登录态 Header 必须非空且长度受限
-L51|        String userId = trimToNull(request.getHeader(TodoConstants.HEADER_USER_ID));
-L52|        String tenantId = trimToNull(request.getHeader(TodoConstants.HEADER_TENANT_ID));
+L32|    public void addInterceptors(InterceptorRegistry registry) {
+L33|        registry.addInterceptor(loginInterceptor)
+L34|                .addPathPatterns(API_PATTERN)
+L35|                .excludePathPatterns("/api/actuator/**")   // 问题：管理端点绕过登录态/来源校验
+L36|                .order(1);
+L37|        registry.addInterceptor(rateLimitInterceptor)
+L38|                .addPathPatterns(API_PATTERN)
+L39|                .excludePathPatterns("/api/actuator/**")
+L40|                .order(2);
+L41|    }
 ```
-
-### P1-1 · `G16.1` · `src/main/java/com/antdigital/todo/item/service/impl/TodoItemServiceImpl.java:57-63`（全链路缺失）
-
-- **等级**：P1
-- **规则**：`G16.1`（核心链路关键指标埋点：成功率/耗时/调用量）；REQ-7 ❌
-- **说明**：`pom.xml` 仅引入 `spring-boot-starter-actuator`，未引入任何 Micrometer registry，也无 `@Timed`/`MeterRegistry`/访问日志实现。设计 §6.5 要求的「错误码分布 TODO_001~007 分桶、DB insert 耗时、连接池活跃数」与 §7.1「Controller 入口/Service 出口埋点」均无法观测，上线后告警规则（错误率 >1%、P99 >500ms）无数据源。
-- 片段范围：`src/main/java/com/antdigital/todo/item/service/impl/TodoItemServiceImpl.java:56-63`
-
-```java
-L56|        TodoItemDO record = buildRecord(title, description, operator);
-L57|        int affectedRows = insertRecord(record);   // 问题：无耗时/成功失败指标埋点
-L58|        if (affectedRows != EXPECTED_AFFECTED_ROWS) {
-L59|            LOGGER.error("待办事项落库影响行数异常, affectedRows={}, tenantId={}, creatorId={}",
-L60|                    affectedRows, operator.getTenantId(), operator.getUserId());
-L61|            throw new BizException(ResultCode.TODO_004);
-L62|        }
-L63|        return buildResponse(record);
-```
-
-### P1-2 · `G16.2` / REQ-7 · `src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java:54-56`
-
-- **等级**：P1
-- **规则**：`G16.2`（异常路径日志须含可追溯上下文 traceId/bizId）
-- **说明**：设计 §4.1 要求「`X-Trace-Id` 缺失时应用生成」，§6.5 要求访问/异常日志带 traceId。实现仅在拒绝日志里回读 Header，缺失时为 `null`（单测日志可见 `traceId=null`），未生成、未放入 MDC，`TodoItemServiceImpl`/`GlobalExceptionHandler` 的异常日志因此无法与单次请求串联。`impl.md` §6 已自述该边界，仍未闭合设计。
-- 片段范围：`src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java:53-57`
-
-```java
-L53|        if (!isValidOperatorField(userId) || !isValidOperatorField(tenantId)) {
-L54|            LOGGER.warn("登录态缺失或非法, uri={}, traceId={}",
-L55|                    request.getRequestURI(), request.getHeader(TodoConstants.HEADER_TRACE_ID)); // 问题：缺失时为 null，未生成
-L56|            throw new BizException(ResultCode.TODO_002, "未登录或登录态失效");
-L57|        }
-```
-
-### P1-3 · `G17.1` · `src/main/java/com/antdigital/todo/common/config/TodoCreateProperties.java:13-17`
-
-- **等级**：P1
-- **规则**：`G17.1`（功能开关支持紧急关闭，不需重启/发布）
-- **Spec 证据**：design §7.3「主开关 `todo.create.enabled`（配置中心动态生效）」「配置项（库连接、灰度尾号、开关、限流阈值）均支持热更新，应急时无需发版」。
-- **代码证据**：`@ConfigurationProperties` 无 `@RefreshScope`，无 `@EventListener(EnvironmentChangeEvent)`/Nacos/Apollo 监听；`WebMvcConfig` 通过构造器注入单例。改配置只能重启实例，`TODO_007` 止血路径实际上要发版，与设计声明不一致。
-- 片段范围：`src/main/java/com/antdigital/todo/common/config/TodoCreateProperties.java:13-26`
-
-```java
-L13|@ConfigurationProperties(prefix = "todo.create")
-L14|public class TodoCreateProperties {
-L15|
-L16|    /** 总开关，关闭后接口直接返回 TODO_007。 */
-L17|    private boolean enabled = true;   // 问题：无 @RefreshScope/配置中心监听，改值需重启
-```
-
-### P2-1 · `A2.4` · `src/main/java/com/antdigital/todo/common/exception/GlobalExceptionHandler.java:7-12`
-
-- **等级**：P2
-- **说明**：import 未按完整引入名 ASCII 字典序排列（`http.converter` 应最前）。
-- 片段范围：`src/main/java/com/antdigital/todo/common/exception/GlobalExceptionHandler.java:7-12`
-
-```java
-L7|import org.springframework.validation.BindException;
-L8|import org.springframework.validation.FieldError;
-L9|import org.springframework.web.bind.MethodArgumentNotValidException;
-L10|import org.springframework.web.bind.annotation.ExceptionHandler;
-L11|import org.springframework.web.bind.annotation.RestControllerAdvice;
-L12|import org.springframework.http.converter.HttpMessageNotReadableException;  // 问题：应位于第 7 行之前
-```
-
-### P2-2 · `A3.4` · `src/main/java/com/antdigital/todo/item/constant/TodoConstants.java:40-41`
-
-- **等级**：P2
-- **说明**：行宽 122 > 120（另见 `TokenBucketRateLimiter.java:9`=125、`TodoCreateIntegrationTest.java:25`=126、`TodoTextNormalizerTest.java:34`=127）。
-- 片段范围：`src/main/java/com/antdigital/todo/item/constant/TodoConstants.java:40-41`
-
-```java
-L40|    /** 单条 INSERT 超时时间（毫秒），与 application.yml 中 default-statement-timeout=3 秒保持一致。 */
-L41|    public static final int INSERT_TIMEOUT_MS = 3000;
-```
-
-### P2-3 · `B004`-类比（未用常量）· `src/main/java/com/antdigital/todo/item/constant/TodoConstants.java:41`
-
-- **等级**：P2
-- **说明**：`INSERT_TIMEOUT_MS` 全仓无引用（`rg INSERT_TIMEOUT_MS` 仅命中定义行），设计 §5.1.1.2 列出的 `DEFAULT_STATUS` 也未落地（改用 `TodoStatus.TODO`）。死常量与文档不一致，易误导后续维护者以为超时由该常量控制。
-- 片段范围：`src/main/java/com/antdigital/todo/item/constant/TodoConstants.java:40-44`
-
-```java
-L40|    /** 单条 INSERT 超时时间（毫秒），与 application.yml 中 default-statement-timeout=3 秒保持一致。 */
-L41|    public static final int INSERT_TIMEOUT_MS = 3000;   // 问题：无任何引用
-L42|
-L43|    /** 展示与存储统一使用 UTC+8。 */
-L44|    public static final ZoneId ZONE_UTC8 = ZoneId.of("Asia/Shanghai");
-```
-
-### P2-4 · `G8.1` · `src/main/java/com/antdigital/todo/common/ratelimit/TokenBucketRateLimiter.java:15-31`
-
-- **等级**：P2
-- **说明**：`buckets` 按 userId 无界增长且无淘汰/过期，长期运行下 Map 条目数随历史用户数单调增长（内部用户量有限，故非 P0/P1）；同时冷用户桶以满容量初始化，理论突发上界为 `qps × 1s`，与设计「实例级近似限流」一致。
-- 片段范围：`src/main/java/com/antdigital/todo/common/ratelimit/TokenBucketRateLimiter.java:15-31`
-
-```java
-L15|    private final Map<String, Bucket> buckets = new ConcurrentHashMap<String, Bucket>();
-L16|
-L17|    /**
-L18|     * 尝试获取一个令牌。
-...
-L25|    public boolean tryAcquire(String key, int permits, int qps) {
-L26|        if (qps <= 0) {
-L27|            return true;
-L28|        }
-L29|        // 单桶容量取 1 秒的令牌量，允许不超过 1 秒的突发
-L30|        Bucket bucket = buckets.computeIfAbsent(key, k -> new Bucket(qps));  // 问题：无淘汰策略
-L31|        return bucket.tryAcquire(permits, qps);
-```
-
-### P2-5 · `G11.2` · `src/test/java/com/antdigital/todo/common/interceptor/LoginInterceptorTest.java:121-133`
-
-- **等级**：P2
-- **说明**：开关/灰度两个用例只断言异常码，未断言「拒绝后 `OperatorContextHolder.get()` 应为 null」，因此 P0-1 未被现有 64 个用例发现；同理缺 `X-User-Id` 长度 >64、emoji 实际落库两类边界用例。
-- 片段范围：`src/test/java/com/antdigital/todo/common/interceptor/LoginInterceptorTest.java:121-133`
-
-```java
-L121|    @Test
-L122|    @DisplayName("总开关关闭：抛 TODO_007")
-L123|    void should_throwTodo007_when_switchOff() {
-L124|        // Arrange
-L125|        createProperties.setEnabled(false);
-L126|        MockHttpServletRequest request = buildRequest("U1001", "张三", "T01");
-L127|
-L128|        // Act & Assert
-L129|        assertThatThrownBy(() -> interceptor.preHandle(request, new MockHttpServletResponse(), new Object()))
-L130|                .isInstanceOf(BizException.class)
-L131|                .extracting(ex -> ((BizException) ex).getResultCode())
-L132|                .isEqualTo(ResultCode.TODO_007);   // 问题：未断言上下文已清理
-L133|    }
-```
-
-### P2-6 · 字符集一致性 · `src/main/resources/application.yml:8`
-
-- **等级**：P2
-- **说明**：表为 `utf8mb4`（`db/todo_item.sql:14`），连接串使用 `characterEncoding=utf8`。Connector/J 8.x 通常将 Java UTF-8 映射为 utf8mb4，但该映射依赖驱动版本与 `connectionCollation`，未显式声明时存在 emoji（4 字节）写入失败或乱码风险；测试侧 H2 无法复现。建议改 `characterEncoding=UTF-8` 并补 emoji 落库用例。
-- 片段范围：`src/main/resources/application.yml:8-11`
 
 ```yaml
-L8|    url: jdbc:mysql://127.0.0.1:3306/ant_todo?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-L9|    username: ${DB_USERNAME:todo}
-L10|    password: ${DB_PASSWORD:todo}
-L11|    driver-class-name: com.mysql.cj.jdbc.Driver
+L21|management:
+L22|  endpoints:
+L23|    web:
+L24|      base-path: /api/actuator          # 与业务同端口同名空间
+L25|      exposure:
+L26|        include: health,metrics,prometheus   # prometheus/metrics 对外可读，无鉴权
 ```
 
-### P2-7 · 默认配置风险 · `src/main/resources/application.yml:31-40`
+### P2-1 · `G16.2` · `src/main/java/com/antdigital/todo/common/security/GatewayIpMatcher.java:101-107`
 
-- **等级**：P2
-- **说明**：`enabled: true` + `gray-enabled: false` 意味着按当前配置发布即为**全量开放**，而设计 §7.2 要求「上线初期置为 `0,1,2` 观察后逐步放开」。建议 `gray-enabled` 默认 `true`，由发布单显式放开。
-- 片段范围：`src/main/resources/application.yml:31-40`
+- **等级**：P2（参考）
+- **规则**：`G16.2`（异常/失败路径缺少可追溯日志）
+- **问题**：`toIpv4Value` 解析失败一律 `return -1L`，无任何日志。白名单写错（如 `10.0.0.300`、`10.0.0`）时全部请求被 `TODO_002` 拒绝，运维只能看到「全量拒绝」而无法定位是哪条白名单非法。
+- 片段范围：`src/main/java/com/antdigital/todo/common/security/GatewayIpMatcher.java:100-107`
 
-```yaml
-L31|todo:
-L32|  create:
-L33|    # 总开关，关闭后新增接口直接返回 TODO_007
-L34|    enabled: true
-L35|    # 按租户尾号灰度，关闭表示全量
-L36|    gray-enabled: false      # 问题：默认全量，与设计「先灰度 0,1,2」不一致
-L37|    gray-tenant-suffix:
-L38|      - "0"
-L39|      - "1"
-L40|      - "2"
+```java
+L100|        for (String segment : segments) {
+L101|            int octet;
+L102|            try {
+L103|                octet = Integer.parseInt(segment);
+L104|            } catch (NumberFormatException ex) {
+L105|                return -1L;   // 问题：静默失败，非法白名单/来源 IP 无日志可查
+L106|            }
+L107|            if (octet < 0 || octet > 255) {
+```
+
+### P2-2 · `G16.1` / REQ-7 · `src/main/java/com/antdigital/todo/item/service/impl/TodoItemServiceImpl.java:66-69`
+
+- **等级**：P2（参考）
+- **说明**：设计 §6.5 要求「DB insert 耗时」单列指标，实现记录的是 `createTodo` 全段耗时（含规范化、校验），insert 变慢与校验变慢无法区分；`todo.create.requests` 在 `GlobalExceptionHandler.fail` 中对所有异常统一打点（当前仅一个接口，无实际偏差，接口扩容后需按 uri 区分）。
+- 片段范围：`src/main/java/com/antdigital/todo/item/service/impl/TodoItemServiceImpl.java:61-69`
+
+```java
+L61|        TodoItemDO record = buildRecord(title, description, operator);
+L62|        int affectedRows = insertRecord(record);      // 未计时：insert 真实耗时未单独埋点
+L63|        if (affectedRows != EXPECTED_AFFECTED_ROWS) {
+L64|            LOGGER.error("待办事项落库影响行数异常, affectedRows={}, tenantId={}, creatorId={}",
+L65|                    affectedRows, operator.getTenantId(), operator.getUserId());
+L66|            throw new BizException(ResultCode.TODO_004);
+L67|        }
+L68|        todoCreateMetrics.recordSuccess(System.nanoTime() - startNanos);   // 记的是整段 service 耗时
+```
+
+### P2-3 · `G11.2` · `src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java:72-74`
+
+- **等级**：P2（参考）
+- **说明**：`X-User-Id`/`X-Tenant-Id` 受 `OPERATOR_FIELD_MAX_LEN=64` 约束（`LoginInterceptor.java:186-188`），而 `X-User-Name` 直接取值写入 `creator_name varchar(128)`（`db/todo_item.sql:9`）。超长展示名会以数据库异常形式落到 `TODO_004`「系统繁忙」，而非可解释的 `TODO_002`；同时无非法字符过滤。设计未对该 Header 约定长度，故按 P2 记录，建议复用 `OPERATOR_FIELD_MAX_LEN` 或按列宽截断。
+- 片段范围：`src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java:71-74`
+
+```java
+L71|
+L72|            String userName = trimToNull(request.getHeader(TodoConstants.HEADER_USER_NAME));
+L73|            OperatorContextHolder.set(new OperatorContext(userId, userName == null ? userId : userName, tenantId));
+L74|            return true;   // 问题：userName 未做长度/字符校验，超 128 字符将在 INSERT 阶段报错
+```
+
+### P2-4 · `G17.1`-补充 · `src/main/java/com/antdigital/todo/common/config/TodoCreateSettings.java:50-55`
+
+- **等级**：P2（参考）
+- **说明**：为满足热更新改为每次请求实时绑定，单次创建请求触发 4 次 `Binder.bind`（`isCreateEnabled`/`isGrayEnabled`/`grayTenantSuffix`/`rateLimitQps`）。当前 50 QPS/实例的量级可接受，但建议加 1s 级本地缓存并在 `EnvironmentChangeEvent` 时失效，避免属性解析占用请求线程。
+- 片段范围：`src/main/java/com/antdigital/todo/common/config/TodoCreateSettings.java:50-55`
+
+```java
+L50|    public boolean isCreateEnabled() {
+L51|        if (binder == null) {
+L52|            return properties.isEnabled();
+L53|        }
+L54|        return binder.bind(KEY_ENABLED, Boolean.class).orElseGet(properties::isEnabled);   // 每请求解析一次
+L55|    }
+```
+
+### P2-5 · 可用性 · `src/main/java/com/antdigital/todo/common/security/GatewayIpMatcher.java:34-58`
+
+- **等级**：P2（参考）
+- **说明**：匹配器只实现 IPv4（`toIpv4Value` 按 `.` 分 4 段），IPv6 来源（如 `::1`、容器双栈环境）一律不匹配 → fail-closed 拒绝。方向安全，但若网关回源走 IPv6，会表现为「白名单已配置仍全量 `TODO_002`」。建议发布单注明只支持 IPv4，或后续支持 IPv6/CIDR6。
+- 片段范围：`src/main/java/com/antdigital/todo/common/security/GatewayIpMatcher.java:34-44`
+
+```java
+L34|    public static boolean matches(List<String> patterns, String ip) {
+L35|        if (patterns == null || patterns.isEmpty() || ip == null) {
+L36|            return false;
+L37|        }
+L38|        for (String pattern : patterns) {
+L39|            if (matchesSingle(pattern, ip)) {   // 仅 IPv4：IPv6 来源恒为 false
+L40|                return true;
+L41|            }
+L42|        }
+L43|        return false;
+L44|    }
+```
+
+### P2-6 · 工程一致性 · `pom.xml:11-12`
+
+- **等级**：P2（参考）
+- **说明**：`name`/`description` 仍为「sort-core / 排序算法核心模块（冒泡排序三变体）」。artifactId 保留可解释（design A01：在 `sort-core` 仓库内新增 Web 能力），但描述与当前交付能力不符，易误导构建产物与后续维护者。
+- 片段范围：`pom.xml:11-12` → **N/A(非 Java)**，原文如下
+
+```xml
+L11|    <name>sort-core</name>
+L12|    <description>排序算法核心模块（冒泡排序三变体）</description>
 ```
 
 ---
 
 ## 8. 修复任务列表
 
-> 供后续改代码时逐项执行与核销；与 §3–§7 中 ❌/⚠️ 及结论中的可执行项一一对应。
+> 与 §3–§7 中 ❌/⚠️ 及结论中的可执行项一一对应；无 P0 待办。
 
 ### P0
 
-- [ ] **P0** `LoginInterceptor.java:69-71` — 在 `preHandle` 内用 `try { checkSwitchAndGray(...) } catch (BizException e) { OperatorContextHolder.clear(); throw e; }` 包裹，或改为校验通过后再 `set` 上下文，确保任何抛出路径都清理 ThreadLocal。
-- [ ] **P0** `LoginInterceptor.java:43-48` — 将网关来源校验改为 fail-closed：白名单为空时拒绝并记安全日志（或启动期校验非空），同时把 `application.yml:45` 的白名单改为环境实际网关 IP/CIDR 配置项，满足 R11。
-- [ ] **P0**（P0-1/P0-2 回归锁定）`LoginInterceptorTest.java:121-133` — 为开关关闭/灰度未命中两个用例补断言 `assertThat(OperatorContextHolder.get()).isNull()`，并为「白名单为空 → TODO_002」补用例，锁定上述两个修复。
+- 无待修复项（上轮 P0-1、P0-2 已闭合，回归用例见 §3.1）。
 
 ### P1
 
-- [ ] **P1** `TodoItemServiceImpl.java:57-63` — 接入 Micrometer：`MeterRegistry` 记录创建调用量/成功率/耗时与错误码分桶，按设计 §6.5 暴露 `TODO_001~007` 维度。
-- [ ] **P1** `LoginInterceptor.java:54-56` — 缺失 `X-Trace-Id` 时生成 UUID 并写入 MDC，`afterCompletion` 中清理；在 `GlobalExceptionHandler` 与 Service 异常日志中输出 traceId。
-- [ ] **P1** `LoginInterceptor.java:41-72` — 增加访问日志（traceId、userId、tenantId、耗时、result）覆盖成功与失败分支（设计 §6.5/§7.1）。
-- [ ] **P1** `TodoCreateProperties.java:13-17` — 为 `todo.create.*` 增加配置中心刷新能力（`@RefreshScope` 或 `EnvironmentChangeEvent` 监听 + 可变持有器），使 `enabled`/`gray-*`/`rate-limit-qps` 改值无需重启。
+- [ ] **P1** `WebMvcConfig.java:33-40` + `application.yml:21-29` — 收敛管理端点为可鉴权：优先 `management.server.port` 独立端口（仅内网）并把 `exposure.include` 收缩为 `health,prometheus`；若必须同端口，则为 `/api/actuator/**` 保留来源白名单校验（`GatewayIpMatcher`）而非整体排除，并在发布单补一条「不带 Header 访问 `/api/actuator/prometheus` 应被拒绝」的验收步骤。
+
+### P1（可选加固，随 P1 一并处理）
+
+- [ ] **P1** `LoginInterceptor.java:72-73` — `X-User-Name` 复用 `OPERATOR_FIELD_MAX_LEN`/`creator_name` 列宽校验，超限回退为 `X-User-Id`。
 
 ### P2（可选）
 
-- [ ] **P2** `GlobalExceptionHandler.java:7-12` — 按 ASCII 字典序重排 import（`org.springframework.http.*` 提前）。
-- [ ] **P2** `TodoConstants.java:40` — 折行至 ≤120 字符；同步处理 `TokenBucketRateLimiter.java:9`、`TodoCreateIntegrationTest.java:25`、`TodoTextNormalizerTest.java:34`。
-- [ ] **P2** `TodoConstants.java:41` — 删除未使用的 `INSERT_TIMEOUT_MS`，或改为在数据源/语句超时处实际引用。
-- [ ] **P2** `TokenBucketRateLimiter.java:15` — 为 `buckets` 增加空闲淘汰（如定时清理或 Caffeine `expireAfterAccess`），避免 Map 无界增长。
-- [ ] **P2** `LoginInterceptorTest.java:121` — 补 `X-User-Id` 长度 >64 与 emoji 名称落库用例，提高边界覆盖率（G11.2）。
-- [ ] **P2** `application.yml:8` — 连接串改 `characterEncoding=UTF-8` 并显式 `connectionCollation=utf8mb4_general_ci`，与 `utf8mb4` 表对齐。
-- [ ] **P2** `application.yml:36` — 将 `gray-enabled` 默认值改为 `true`，发布时按设计 §7.2 以 `0,1,2` 起步灰度。
+- [ ] **P2** `GatewayIpMatcher.java:105-107` — 解析失败分支补 `LOGGER.warn("非法 IP 表达式, value={}")`，消除 fail-closed 排障盲区。
+- [ ] **P2** `TodoItemServiceImpl.java:62` — 为 `insertRecord` 单独计时并写入 `todo.create.db.insert.cost`，与设计 §6.5「DB insert 耗时」对齐。
+- [ ] **P2** `GlobalExceptionHandler.java:94` — 指标加 `uri` 标签或在 `TodoItemController`/Service 层打点，避免接口扩容后非创建接口的失败污染 `todo.create.requests`。
+- [ ] **P2** `TodoCreateSettings.java:50-92` — 增加 1s 级本地缓存 + `EnvironmentChangeEvent` 失效，降低每请求 4 次属性绑定开销。
+- [ ] **P2** `GatewayIpMatcher.java:34-58` — 明确「仅支持 IPv4」并在发布单标注；如需 IPv6 回源再扩展 CIDR6。
+- [ ] **P2** `pom.xml:11-12` — 更新 `name`/`description` 为「todo 待办事项服务（含排序模块）」，保持构建产物元信息准确。

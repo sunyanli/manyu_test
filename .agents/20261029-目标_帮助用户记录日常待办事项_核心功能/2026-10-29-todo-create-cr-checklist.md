@@ -344,3 +344,123 @@ Engine:  ripgrep
 `LOGGER.error("待办事项写库失败, tenantId={}, creatorId={}", ..., ex)`，满足 G16.2/G16.4；
 脚本基于「catch 与日志不在同一行/最近 2 行」的正则未命中，人工核销为 ✅。
 
+---
+
+## Round 2 — 修复后复审（Commit `00bc14d`，2026-10-29）
+
+> **目的**：核销 Round 1 的 P0×2 / P1×3 / P2×7，并复核修复引入的新风险。
+> **范围**：`git diff --name-only HEAD~1` → 24 个 `.java`（主代码 13 + 测试 11），逐文件重跑 Step 2→3→4→5。
+> **验证**：`JAVA_HOME=zulu17 mvn -o test` → `Tests run: 88, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS`。
+
+### R2 Step 1 — 复审执行队列（逐文件，禁止 glob）
+
+| # | 文件（仓库相对路径） | 归属原因 | Step2 | Step3 | Step4（G/S/B/M/I） | 总状态 |
+|---|----------------------|----------|-------|-------|--------------------|--------|
+| 1 | `src/main/java/com/antdigital/todo/common/config/TodoCreateProperties.java` | P1-3 灰度默认值 | ✅ | ✅ | ✅ | ✅ 已审 |
+| 2 | `src/main/java/com/antdigital/todo/common/config/TodoCreateSettings.java` | 新增：运行期配置读取（G17.1） | ✅ | ✅ | ⚠️ P2-4 | ⚠️ 已审有问题 |
+| 3 | `src/main/java/com/antdigital/todo/common/exception/GlobalExceptionHandler.java` | 失败指标 + traceId + import 序 | ✅ | ✅ | ⚠️ P2-2 | ⚠️ 已审有问题 |
+| 4 | `src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java` | P0-1 / P0-2 主修复点 | ✅ | ✅ | ⚠️ P2-3 | ⚠️ 已审有问题 |
+| 5 | `src/main/java/com/antdigital/todo/common/interceptor/RateLimitInterceptor.java` | 改用 `TodoCreateSettings` | ✅ | ✅ | ✅ | ✅ 已审 |
+| 6 | `src/main/java/com/antdigital/todo/common/metrics/TodoCreateMetrics.java` | 新增：G16.1 指标 | ✅ | ✅ | ✅ | ✅ 已审 |
+| 7 | `src/main/java/com/antdigital/todo/common/ratelimit/TokenBucketRateLimiter.java` | P2-4 空闲淘汰 | ✅ | ✅ | ✅ | ✅ 已审 |
+| 8 | `src/main/java/com/antdigital/todo/common/security/GatewayIpMatcher.java` | 新增：S8.1 IP/CIDR 匹配 | ✅ | ✅ | ⚠️ P2-1 / P2-5 | ⚠️ 已审有问题 |
+| 9 | `src/main/java/com/antdigital/todo/common/security/TrustedGatewayProperties.java` | fail-closed 语义 | ✅ | ✅ | ✅ | ✅ 已审 |
+| 10 | `src/main/java/com/antdigital/todo/common/trace/TraceContext.java` | 新增：G16.2 traceId | ✅ | ✅ | ✅ | ✅ 已审 |
+| 11 | `src/main/java/com/antdigital/todo/common/trace/TraceIdFilter.java` | 新增：G8.5 过滤器兜底清理 | ✅ | ✅ | ✅ | ✅ 已审 |
+| 12 | `src/main/java/com/antdigital/todo/item/constant/TodoConstants.java` | P2-2 行宽 / P2-3 死常量 | ✅ | ✅ | ✅ | ✅ 已审 |
+| 13 | `src/main/java/com/antdigital/todo/item/service/impl/TodoItemServiceImpl.java` | G16.1 成功埋点 | ✅ | ✅ | ⚠️ P2-2 | ⚠️ 已审有问题 |
+| 14 | `src/test/java/com/antdigital/todo/common/config/TodoCreateSettingsTest.java` | 热更新用例 | ✅ | ✅ | ✅ | ✅ 已审 |
+| 15 | `src/test/java/com/antdigital/todo/common/interceptor/LoginInterceptorTest.java` | P0 回归锁定用例 | ✅ | ✅ | ✅ | ✅ 已审 |
+| 16 | `src/test/java/com/antdigital/todo/common/interceptor/RateLimitInterceptorTest.java` | 适配新构造 | ✅ | ✅ | ✅ | ✅ 已审 |
+| 17 | `src/test/java/com/antdigital/todo/common/metrics/TodoCreateMetricsTest.java` | 指标分桶用例 | ✅ | ✅ | ✅ | ✅ 已审 |
+| 18 | `src/test/java/com/antdigital/todo/common/ratelimit/TokenBucketRateLimiterTest.java` | 淘汰用例 | ✅ | ✅ | ✅ | ✅ 已审 |
+| 19 | `src/test/java/com/antdigital/todo/common/security/GatewayIpMatcherTest.java` | fail-closed 用例 | ✅ | ✅ | ✅ | ✅ 已审 |
+| 20 | `src/test/java/com/antdigital/todo/common/trace/TraceContextTest.java` | 防注入/清理用例 | ✅ | ✅ | ✅ | ✅ 已审 |
+| 21 | `src/test/java/com/antdigital/todo/item/controller/TodoCreateIntegrationTest.java` | 端到端回归 | ✅ | ✅ | ✅ | ✅ 已审 |
+| 22 | `src/test/java/com/antdigital/todo/item/controller/TodoItemControllerTest.java` | 适配新构造 | ✅ | ✅ | ✅ | ✅ 已审 |
+| 23 | `src/test/java/com/antdigital/todo/item/service/impl/TodoItemServiceImplTest.java` | `recordSuccess` 断言 | ✅ | ✅ | ✅ | ✅ 已审 |
+| 24 | `src/test/java/com/antdigital/todo/item/util/TodoTextNormalizerTest.java` | 行宽整改 | ✅ | ✅ | ✅ | ✅ 已审 |
+
+**跳过（非 Java，仅作证据）**：`pom.xml`（Prometheus 依赖 / 元信息 → P2-6）、`src/main/resources/application.yml`（白名单、指标端点、日志 pattern、灰度默认值）、`src/test/resources/application-test.yml`（测试白名单回环放行）、`fix_report.md`。
+
+### R2 Step 2 — Round 1 问题核销
+
+| 上轮 | 状态 | 本轮证据 |
+|------|------|----------|
+| P0-1 `G8.5` ThreadLocal 残留 | ✅ 已闭合 | `LoginInterceptor.java:63-81,155-159`；`TraceIdFilter.java:33-37`；3 个拒绝路径断言 + 1 个端到端用例 |
+| P0-2 `S8.1`/R11 fail-open | ✅ 已闭合 | `LoginInterceptor.java:99-113`；`GatewayIpMatcher.java:34-58`；`application.yml:46`；6 个单测 + 1 个端到端 |
+| P1-1 `G16.1` 指标/访问日志 | ✅ 已闭合 | `TodoCreateMetrics.java:44-59`；`GlobalExceptionHandler.java:92-96`；`LoginInterceptor.java:166-176` |
+| P1-2 `G16.2` traceId | ✅ 已闭合 | `TraceContext.java:37-62`；`TraceIdFilter.java:31-37`；`application.yml:48-51` |
+| P1-3 `G17.1` 热更新 | ✅ 已闭合 | `TodoCreateSettings.java:40-92`；端到端运行期开关用例 |
+| P2-1 import 序 | ✅ 已修复 | `GlobalExceptionHandler.java:10-15` |
+| P2-2 行宽 | ✅ 已修复 | 全量复测 24 个变更文件无 >120 列 |
+| P2-3 死常量 | ✅ 已修复 | `INSERT_TIMEOUT_MS`/`DEFAULT_STATUS` 全仓 0 引用 |
+| P2-4 令牌桶无淘汰 | ✅ 已修复 | `TokenBucketRateLimiter.java:16-32,72-82`（60s 扫描 / 300s 空闲淘汰） |
+| P2-5 测试缺口 | ✅ 已修复 | 64 → 88 例；含上下文清理、空白名单、超长 Header、emoji 落库 |
+| P2-6 字符集 | ✅ 已修复 | `application.yml:8`（`characterEncoding=UTF-8` + `connectionCollation=utf8mb4_general_ci`） |
+| P2-7 默认全量 | ✅ 已修复 | `application.yml:36` + `TodoCreateProperties.java:20`（`gray-enabled=true`） |
+
+### R2 Step 3 — 可读性
+
+| ID | 状态 | 备注 |
+|----|------|------|
+| A1 | ✅ | 命名/UTF-8/无 Tab |
+| A2 | ✅ | import 按 ASCII 序（上轮 A2.4 已整改，`GlobalExceptionHandler.java:10-15`） |
+| A3 | ✅ | 4 空格/K&R；行宽复测无 >120（被审 24 文件） |
+| A4 | ✅ | 命名规范一致 |
+| A5 | ✅ | `@Override` 齐全；无空 catch、无 `System.out`、无 `printStackTrace` |
+| A6 | ✅ | 元素样式一致 |
+| A7 | ✅ | 新增 5 个类均有类/方法级 Javadoc |
+
+### R2 Step 4 — 可靠性 / 安全 / Bug 模式（仅列有变化的 ID）
+
+| ID | 状态 | 备注 |
+|----|------|------|
+| G8.5 | ✅ | ThreadLocal 三条路径全清理（`preHandle` 拒绝、`afterCompletion`、`TraceIdFilter.finally`） |
+| G11.2 | ⚠️ | `X-User-Name` 超长用例缺失，对应 P2-3 |
+| G16.1 | ✅ | 成功量/耗时/错误码分桶落地；DB insert 独立耗时未单列 → P2-2 |
+| G16.2 | ⚠️ | 预扫 5 条：4 条误报，`GatewayIpMatcher.java:105` 真命中 → P2-1（P2 降级，因结果仍 fail-closed） |
+| G16.3 | ✅ | 业务异常 WARN、系统异常 ERROR、访问日志 INFO |
+| G17.1 | ✅ | 运行期 `Binder` 实时读取，改值即生效（P2-4 为性能建议） |
+| G17.2 | ✅ | 开关关闭 → TODO_007 兜底，不写库 |
+| G14.2 | ✅ | 租户仅取自 `OperatorContext`，且来源受白名单约束 |
+| G15.1 | ✅ | 本轮无表结构变更 |
+| S8.1 | ⚠️ | 业务链路闭合；管理端点无鉴权 → **P1-1** |
+| S9.1 | ✅ | 库凭证走 `${DB_USERNAME}/${DB_PASSWORD}`；白名单走 `${TRUSTED_GATEWAY_IPS}` |
+| S9.2 | ✅ | 日志不输出描述全文；`creator_id` 为内部 ID |
+| S1.1–S1.3 / S2.* / S3.* / S4.* / S5.* / S6.* / S7.* / S10.* | N/A | 无 SQL 拼接、无富文本、无外部 URL/命令/XML/文件上传、无 CORS 通配 |
+| B001–B081 / M001–M027 / I001–I010 | ✅ | 逐条核销无 Blocker/Major 命中 |
+
+### R2 Step 5 — 自定义扩展
+
+| ID | 状态 | 备注 |
+|----|------|------|
+| U1.1 | ✅ | `@Valid @RequestBody`（`TodoItemController.java:40`） |
+| U1.2 / U1.3 / U2.* | N/A | `N/A(未启用自定义规则)` |
+
+### R2 附录 B — `scan-all-rules.sh` 预扫输出（Round 2 原文）
+
+```text
+=== Step 4 Rule Scan (B/M/I + A/S/G) ===
+Targets: src/main/java/com/antdigital/todo src/test/java/com/antdigital/todo
+Engine:  ripgrep
+
+[P0] G16.2 — CatchWithoutLogging: src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java:75
+[P0] G16.2 — CatchWithoutLogging: src/main/java/com/antdigital/todo/common/interceptor/LoginInterceptor.java:78
+[P0] G16.2 — CatchWithoutLogging: src/main/java/com/antdigital/todo/common/security/GatewayIpMatcher.java:105
+[P0] G16.2 — CatchWithoutLogging: src/main/java/com/antdigital/todo/common/security/GatewayIpMatcher.java:66
+[P0] G16.2 — CatchWithoutLogging: src/main/java/com/antdigital/todo/item/service/impl/TodoItemServiceImpl.java:119
+
+=== Summary: 5 findings (P0=5, P1=0, P2=0) | 52/222 rules scanned ===
+```
+
+**复核结论**：`LoginInterceptor.java:75/78`（→`handleRejected` 内 clear + 访问日志）、`GatewayIpMatcher.java:66`（紧邻 `LOGGER.warn`）、`TodoItemServiceImpl.java:119`（`LOGGER.error(..., ex)`）为**误报**；`GatewayIpMatcher.java:105` 为**真命中**，但结果仍是 fail-closed（拒绝而非放行），按影响面降级为 **P2-1**。
+
+### R2 终检
+
+- [x] 复审队列 24 个文件 Step2/Step3/Step4 均非 `⬜`
+- [x] Round 1 的 12 项（P0×2 / P1×3 / P2×7）逐项核销完毕
+- [x] 预扫输出已并入 Step 4 并逐条人工复核
+- [x] 全部 `❌/⚠️` 已写入 `cr_report.md` §3–§7，且含 ID + `path:line`
+- [x] 报告末尾含 §8 修复任务列表
+
