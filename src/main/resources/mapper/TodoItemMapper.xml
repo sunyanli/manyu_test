@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!--
+  待办事项表映射。
+  规范要点：显式字段列表（禁止 SELECT *）、全参数化占位符（禁止 ${}）、
+  布尔语义字段库侧 is_deleted 与 Java 侧 deleted 分离。
+-->
+<mapper namespace="com.antdigital.todo.dao.mapper.TodoItemMapper">
+
+    <resultMap id="TodoItemResultMap" type="com.antdigital.todo.dao.entity.TodoItemDO">
+        <id column="id" property="id" jdbcType="BIGINT"/>
+        <result column="todo_no" property="todoNo" jdbcType="VARCHAR"/>
+        <result column="request_id" property="requestId" jdbcType="VARCHAR"/>
+        <result column="tenant_id" property="tenantId" jdbcType="VARCHAR"/>
+        <result column="item_name" property="itemName" jdbcType="VARCHAR"/>
+        <result column="item_desc" property="itemDesc" jdbcType="VARCHAR"/>
+        <result column="status" property="status" jdbcType="TINYINT"/>
+        <result column="creator_id" property="creatorId" jdbcType="VARCHAR"/>
+        <result column="creator_name" property="creatorName" jdbcType="VARCHAR"/>
+        <result column="source" property="source" jdbcType="VARCHAR"/>
+        <result column="is_deleted" property="deleted" jdbcType="TINYINT"/>
+        <result column="gmt_create" property="gmtCreate" jdbcType="TIMESTAMP"/>
+        <result column="gmt_modified" property="gmtModified" jdbcType="TIMESTAMP"/>
+    </resultMap>
+
+    <sql id="BaseColumns">
+        id, todo_no, request_id, tenant_id, item_name, item_desc,
+        status, creator_id, creator_name, source, is_deleted, gmt_create, gmt_modified
+    </sql>
+
+    <select id="selectByRequestId" resultMap="TodoItemResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM todo_item
+        WHERE tenant_id = #{tenantId}
+        AND request_id = #{requestId}
+        AND is_deleted = 0
+        LIMIT 1
+    </select>
+
+    <!-- 唯一键冲突后的幂等回查：加锁读可读到并发事务刚提交的记录（快照读不可见） -->
+    <select id="selectByRequestIdForUpdate" resultMap="TodoItemResultMap">
+        SELECT
+        <include refid="BaseColumns"/>
+        FROM todo_item
+        WHERE tenant_id = #{tenantId}
+        AND request_id = #{requestId}
+        AND is_deleted = 0
+        LIMIT 1
+        FOR UPDATE
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id" keyColumn="id"
+            parameterType="com.antdigital.todo.dao.entity.TodoItemDO">
+        INSERT INTO todo_item (
+            todo_no, request_id, tenant_id, item_name, item_desc,
+            status, creator_id, creator_name, source, is_deleted, gmt_create, gmt_modified
+        ) VALUES (
+            #{todoNo}, #{requestId}, #{tenantId}, #{itemName}, #{itemDesc},
+            #{status}, #{creatorId}, #{creatorName}, #{source}, #{deleted}, #{gmtCreate}, #{gmtModified}
+        )
+    </insert>
+
+</mapper>
