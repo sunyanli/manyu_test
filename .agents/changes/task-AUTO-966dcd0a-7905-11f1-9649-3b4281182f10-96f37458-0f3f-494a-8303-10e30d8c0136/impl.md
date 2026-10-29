@@ -129,3 +129,77 @@ python3 -m unittest test_sortkit -v
 | `impl.md` | 新增 | 本编码报告 |
 
 > 既有 `bubble_sort.py` 未改动，保持旧调用方兼容（符合系分「可应急」章节）。
+---
+
+## 本轮补充（编码实现 · round 2）：快速排序健壮性强化
+
+> | 项目 | 内容 |
+> |------|------|
+> | 需求 | 实现一个快速排序算法 |
+> | 变更文件 | `sortkit.py`（快速排序分区与递归策略）、`test_sortkit.py`（新增 2 个用例） |
+> | 技术栈决策 | 仓库为纯 Python 项目且无 Java 工程（`mvn`/`java` 均不可用），按「已验证事实 + 最小改动」继续以 Python 落地 `sortkit.quick_sort`，并沿用 Java 规范中可移植的命名 / 注释 / 单测内核 |
+
+### 阶段一：READ
+
+**模块职责**：`sortkit.quick_sort` 提供原地快速排序，默认算法 `quick` 由统一入口 `sort()` 分发。
+
+**关键函数**：
+- `quick_sort(data)` - 对外入口，长度 < 2 直接返回
+- `_quick_sort_range(data, low, high)` - 区间排序（递归 + 迭代混合）
+- `_partition(data, low, high)` - 三向分区，返回相等区边界 `(lt, gt)`
+- `_insertion_sort(data, low, high)` - 小规模子区插入排序
+
+**已加载规范**：`naming.md`、`comments.md`、`unit-testing.md`（AAA / FIRST / 覆盖摘要内核）
+
+### 阶段二：TEST（先失败）
+
+| 新增方法 | 测试场景 | 修复前状态 |
+|----------|----------|:----------:|
+| `test_should_not_exceed_recursion_limit_on_massive_duplicates` | 5000 个相同元素，验证不爆栈 | ❌ RecursionError |
+| `test_should_handle_mixed_duplicates_with_large_input` | 3000 元素仅 4 种取值，验证分区正确性 | ⚠️ 可过但覆盖不足 |
+
+**缺陷复现（修复前，独立命令）**：`quick_sort([0]*1200)` → `RecursionError: maximum recursion depth exceeded`，原因是 Lomuto 双路分区遇到全相等元素时每层仅缩小 1 个元素，递归深度退化为 O(n)。
+
+### 阶段三：IMPL
+
+- 分区由 Lomuto 双路改为 **三向分区（Dijkstra 荷兰国旗）**：`< pivot` / `== pivot` / `> pivot`，相等元素一次归位，重复值密集输入不再退化。
+- 递归策略改为 **只递归较小分区、较大分区转循环**（尾调用消除），递归栈深度上界由 O(n) 降为 O(log n)。
+- 保留三数取中选枢轴与小规模切插入排序（`INSERTION_THRESHOLD = 10`）。
+- 返回值语义不变：原地排序并返回同一列表引用；`sort(reverse=True)` 的 `_Descending` 包装路径不受影响。
+- 同步更新模块文档字符串与方法注释，避免注释与实现不同步。
+
+**编译验证**：`python3 -m py_compile sortkit.py test_sortkit.py` ✅
+
+### 阶段四：CHECK
+
+#### L1 静态检查（快速排序相关）
+
+| 检查项 | 规范要求 | 符合情况 |
+|--------|----------|:--------:|
+| 命名规范 | 函数小写下划线、常量全大写下划线（`INSERTION_THRESHOLD`） | ✅ |
+| 注释规范 | 函数与模块级 docstring、内部逻辑单行注释跟随实现 | ✅ |
+| 异常处理 | 不吞异常；不可比较元素统一包装 `NotComparableError` | ✅ |
+| 控制流 | 单层分支 + while 循环，无深层嵌套 | ✅ |
+| 未使用代码 | 旧 Lomuto 分区逻辑已整体替换，无残留分支 | ✅ |
+| 单元测试 | AAA 结构、断言驱动、覆盖正常/边界/退化场景 | ✅ |
+
+#### L2 动态验证
+
+| 验证项 | 命令 | 结果 |
+|--------|------|------|
+| 语法编译 | `python3 -m py_compile sortkit.py test_sortkit.py` | ✅ 通过 |
+| 单元测试 | `python3 -m unittest test_sortkit` | ✅ 26 tests OK（exit 0） |
+| 独立冒烟 | 走真实入口 `sort()` / `quick_sort()` 的 11 组自构造输入 | ✅ FAILURES: none |
+
+冒烟覆盖：20 万重复值、双取值 5 万、随机 10 万、全升序/全降序 5 万、近似有序 2 万、空/单/双元素、字符串 5 千、`reverse=True`、原地引用一致、把递归上限压到 120 仍可排序 1 万元素（验证栈深受控）、不可比较元素抛 `NotComparableError`。
+
+#### 待人工验证
+
+```bash
+python3 -m unittest test_sortkit -v
+```
+
+### 阶段五：DOCS
+
+- 架构文档 / 模块文档：不适用（无 `SSOT.md`、无 `docs/` 体系，纯单文件工具库）
+- 编码报告：本文件（`.agents/changes/task-AUTO-966dcd0a-7905-11f1-9649-3b4281182f10-96f37458-0f3f-494a-8303-10e30d8c0136/impl.md`）

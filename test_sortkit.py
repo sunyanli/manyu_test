@@ -109,6 +109,23 @@ class TestQuickSort(unittest.TestCase):
         # Assert
         self.assertEqual(expected, result)
 
+    def test_should_not_exceed_recursion_limit_on_massive_duplicates(self):
+        # Arrange：5000 个相同元素，双路分区会逐层只缩小一个元素而耗尽递归栈
+        data = [7] * 5000
+        # Act
+        result = quick_sort(data)
+        # Assert
+        self.assertEqual([7] * 5000, result)
+
+    def test_should_handle_mixed_duplicates_with_large_input(self):
+        # Arrange：大量重复值混合随机分布，验证分区后顺序正确
+        data = [random.choice([0, 1, 2, 5]) for _ in range(3000)]
+        expected = sorted(data.copy())
+        # Act
+        result = quick_sort(data)
+        # Assert
+        self.assertEqual(expected, result)
+
 
 class TestMergeSort(unittest.TestCase):
     """归并排序测试（稳定排序）。"""
