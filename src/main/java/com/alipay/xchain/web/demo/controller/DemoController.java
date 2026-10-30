@@ -14,12 +14,21 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 
 import javax.validation.Valid;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 /**
@@ -90,17 +99,25 @@ public class DemoController {
 
         byte[] excelBytes = apiCallRecordService.export(type);
 
-        String fileName = "api_demo_" + type + "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + ".xlsx";
+        String fileName = "api_demo_" + type + "_"
+                + LocalDateTime.now(ZoneId.of("Asia/Shanghai"))
+                        .format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
+                + ".xlsx";
         String encodedFileName;
         try {
-            encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8.name()).replace("+", "%20");
+            encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8.name())
+                    .replace("+", "%20");
         } catch (Exception e) {
+            logger.warn("文件名URL编码失败, 使用默认文件名, fileName: {}", fileName, e);
             encodedFileName = "export.xlsx";
         }
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedFileName + "\"; filename*=UTF-8''" + encodedFileName)
-                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + encodedFileName
+                                + "\"; filename*=UTF-8''" + encodedFileName)
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(excelBytes);
     }
 
@@ -129,8 +146,8 @@ public class DemoController {
     /**
      * 统一异常处理 - 参数校验
      */
-    @ExceptionHandler(org.springframework.web.bind.MethodArgumentNotValidException.class)
-    public CommonResponse<Void> handleValidationException(org.springframework.web.bind.MethodArgumentNotValidException e) {
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public CommonResponse<Void> handleValidationException(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .map(err -> err.getField() + ": " + err.getDefaultMessage())
                 .reduce((a, b) -> a + "; " + b)

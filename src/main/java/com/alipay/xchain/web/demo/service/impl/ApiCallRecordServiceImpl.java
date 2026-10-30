@@ -5,11 +5,19 @@ import com.alipay.xchain.web.demo.dao.mapper.ApiCallRecordMapper;
 import com.alipay.xchain.web.demo.model.ApiCallRecordDO;
 import com.alipay.xchain.web.demo.response.StatsResultVO;
 import com.alipay.xchain.web.demo.service.ApiCallRecordService;
-import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.BorderStyle;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.HorizontalAlignment;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -18,8 +26,13 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 接口调用埋点记录服务实现
@@ -34,6 +47,11 @@ public class ApiCallRecordServiceImpl implements ApiCallRecordService {
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
     private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
+
+    /** 导出查询上限，可通过配置覆盖 */
+    @Value("${demo.export.limit:1000}")
+    private int exportLimit;
 
     /** 维度列名映射 */
     private static final Map<String, String> DIMENSION_COLUMN_MAP = new HashMap<>();
@@ -48,7 +66,7 @@ public class ApiCallRecordServiceImpl implements ApiCallRecordService {
     private ApiCallRecordMapper apiCallRecordMapper;
 
     @Override
-    @Async
+    @Async("trackExecutor")
     public void record(ApiCallRecordDO record) {
         try {
             apiCallRecordMapper.insert(record);
@@ -68,10 +86,23 @@ public class ApiCallRecordServiceImpl implements ApiCallRecordService {
 
         // 默认时间窗：近 7 天
         if (startDate == null || startDate.isEmpty()) {
-            startDate = LocalDate.now().minusDays(7).format(DATE_FMT);
+            startDate = LocalDate.now(ZONE).minusDays(7).format(DATE_FMT);
         }
         if (endDate == null || endDate.isEmpty()) {
-            endDate = LocalDate.now().format(DATE_FMT);
+            endDate = LocalDate.now(ZONE).format(DATE_FMT);
+        }
+
+        // 校验日期格式
+        LocalDate start;
+        LocalDate end;
+        try {
+            start = LocalDate.parse(startDate, DATE_FMT);
+            end = LocalDate.parse(endDate, DATE_FMT);
+        } catch (DateTimeParseException e) {
+            throw new DemoException("DEMO_041", "日期格式非法，请使用 yyyy-MM-dd 格式");
+        }
+        if (start.isAfter(end)) {
+            throw new DemoException("DEMO_042", "开始日期不能晚于结束日期");
         }
 
         String startTime = startDate + " 00:00:00";
@@ -125,7 +156,7 @@ public class ApiCallRecordServiceImpl implements ApiCallRecordService {
             throw new DemoException("DEMO_030", "导出类型非法: " + type + "，可选 hello/hash/sort");
         }
 
-        List<ApiCallRecordDO> records = apiCallRecordMapper.listByApiName(type, 1000);
+        List<ApiCallRecordDO> records = apiCallRecordMapper.listByApiName(type, exportLimit);
 
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("导出数据");
@@ -152,7 +183,9 @@ public class ApiCallRecordServiceImpl implements ApiCallRecordService {
                 row.createCell(4).setCellValue(record.getPersonType() != null ? record.getPersonType() : "");
                 row.createCell(5).setCellValue(record.getPersonLevel() != null ? record.getPersonLevel() : "");
                 row.createCell(6).setCellValue(record.getPersonDept() != null ? record.getPersonDept() : "");
-                row.createCell(7).setCellValue(record.getCallTime() != null ? record.getCallTime().format(DATETIME_FMT) : "");
+                row.createCell(7).setCellValue(
+                        record.getCallTime() != null
+                                ? record.getCallTime().format(DATETIME_FMT) : "");
                 row.createCell(8).setCellValue(record.getResultStatus() != null ? record.getResultStatus() : "");
 
                 for (int i = 0; i < headers.length; i++) {

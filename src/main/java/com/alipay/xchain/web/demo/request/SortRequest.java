@@ -1,7 +1,6 @@
 package com.alipay.xchain.web.demo.request;
 
 import javax.validation.constraints.NotEmpty;
-import javax.validation.constraints.NotNull;
 import java.util.List;
 
 /**
@@ -14,7 +13,6 @@ public class SortRequest {
 
     /** 待排序数字数组，非空且全为数字 */
     @NotEmpty(message = "排序输入不能为空")
-    @NotNull(message = "排序输入不能为空")
     private List<Integer> numbers;
 
     /** 排序方向，默认 asc，可选 asc/desc */

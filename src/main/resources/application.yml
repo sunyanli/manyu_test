@@ -32,3 +32,12 @@ mybatis-plus:
 logging:
   level:
     com.alipay.xchain: debug
+
+# CORS 跨域配置（开发环境默认全通配，生产环境限定白名单，逗号分隔）
+cors:
+  allowed-origins: "*"
+
+# 演示模块配置
+demo:
+  export:
+    limit: 1000

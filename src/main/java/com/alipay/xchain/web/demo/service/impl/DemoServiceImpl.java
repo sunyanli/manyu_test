@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -202,12 +203,12 @@ public class DemoServiceImpl implements DemoService {
             record.setPersonType("");
             record.setPersonLevel("");
             record.setPersonDept("");
-            record.setCallTime(java.time.LocalDateTime.now());
+            record.setCallTime(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
             record.setResultStatus(status);
-            record.setGmtCreate(java.time.LocalDateTime.now());
-            record.setGmtModified(java.time.LocalDateTime.now());
+            record.setGmtCreate(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
+            record.setGmtModified(LocalDateTime.now(ZoneId.of("Asia/Shanghai")));
             apiCallRecordService.record(record);
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             logger.error("埋点记录失败, apiName: {}, userId: {}", apiName, userId, e);
         }
     }
