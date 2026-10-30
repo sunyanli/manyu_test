@@ -1,0 +1,26 @@
+{
+  "name": "xchain-demo-web",
+  "version": "1.0.0",
+  "private": true,
+  "description": "xchain 接口演示与调用统计报表前端",
+  "scripts": {
+    "dev": "bigfish dev",
+    "build": "bigfish build",
+    "postinstall": "bigfish setup"
+  },
+  "dependencies": {
+    "@ant-design/charts": "^2.2.1",
+    "@ant-design/icons": "^5.3.7",
+    "@ant-design/pro-components": "^2.7.0",
+    "antd": "^5.17.0",
+    "dayjs": "^1.11.11",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.79",
+    "@types/react-dom": "^18.2.25",
+    "bigfish": "^4.1.0",
+    "typescript": "^5.4.5"
+  }
+}
