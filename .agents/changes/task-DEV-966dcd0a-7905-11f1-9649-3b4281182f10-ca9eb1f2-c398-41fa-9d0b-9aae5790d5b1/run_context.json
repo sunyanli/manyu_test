@@ -1,0 +1,13 @@
+{
+  "run_id": "DEV-966dcd0a-7905-11f1-9649-3b4281182f10-ca9eb1f2-c398-41fa-9d0b-9aae5790d5b1",
+  "stage": "review",
+  "job": "代码评审",
+  "skill": "dtazziboot-java-code-review",
+  "blocker_count": 1,
+  "p0_count": 1,
+  "p1_count": 5,
+  "p2_count": 6,
+  "merge_recommendation": "修复P0后合并",
+  "summary": "功能覆盖完整(8/8 REQ)，仓间契约对齐良好；1个P0空catch需修复，5个P1安全/可靠性改进，6个P2风格优化项",
+  "timestamp": "2026-10-30T00:00:00Z"
+}
