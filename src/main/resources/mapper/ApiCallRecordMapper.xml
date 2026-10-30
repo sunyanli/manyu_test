@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.alipay.xchain.web.demo.dao.mapper.ApiCallRecordMapper">
+
+    <resultMap id="ApiCallRecordMap" type="com.alipay.xchain.web.demo.model.ApiCallRecordDO">
+        <id column="id" property="id"/>
+        <result column="api_name" property="apiName"/>
+        <result column="caller_id" property="callerId"/>
+        <result column="caller_name" property="callerName"/>
+        <result column="person_type" property="personType"/>
+        <result column="person_level" property="personLevel"/>
+        <result column="person_dept" property="personDept"/>
+        <result column="call_time" property="callTime"/>
+        <result column="result_status" property="resultStatus"/>
+        <result column="gmt_create" property="gmtCreate"/>
+        <result column="gmt_modified" property="gmtModified"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.alipay.xchain.web.demo.model.ApiCallRecordDO" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO api_call_record (
+            api_name, caller_id, caller_name, person_type, person_level, person_dept,
+            call_time, result_status, gmt_create, gmt_modified
+        ) VALUES (
+            #{apiName}, #{callerId}, #{callerName}, #{personType}, #{personLevel}, #{personDept},
+            #{callTime}, #{resultStatus}, #{gmtCreate}, #{gmtModified}
+        )
+    </insert>
+
+    <select id="statsByDimension" resultType="java.util.HashMap">
+        SELECT ${column} AS name, COUNT(*) AS callCount
+        FROM api_call_record
+        WHERE call_time BETWEEN #{startTime} AND #{endTime}
+        AND ${column} IS NOT NULL AND ${column} != ''
+        GROUP BY ${column}
+        ORDER BY callCount DESC
+    </select>
+
+    <select id="dailyTrend" resultType="java.util.HashMap">
+        SELECT DATE_FORMAT(call_time, '%Y-%m-%d') AS date, COUNT(*) AS callCount
+        FROM api_call_record
+        WHERE call_time BETWEEN #{startTime} AND #{endTime}
+        GROUP BY DATE_FORMAT(call_time, '%Y-%m-%d')
+        ORDER BY date ASC
+    </select>
+
+    <select id="listByApiName" resultMap="ApiCallRecordMap">
+        SELECT id, api_name, caller_id, caller_name, person_type, person_level, person_dept,
+               call_time, result_status, gmt_create, gmt_modified
+        FROM api_call_record
+        WHERE api_name = #{apiName}
+        ORDER BY gmt_create DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>
